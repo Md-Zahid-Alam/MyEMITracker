@@ -1,0 +1,13 @@
+My EMI Tracker - Version 1
+
+This is a complete Android Studio project source for a personal offline EMI tracker.
+
+Package:
+com.example.myemitracker
+
+Version:
+1.0
+
+The app does not require an online account or backend.
+
+For the next version, automatic EMI reminder scheduling can be added.
