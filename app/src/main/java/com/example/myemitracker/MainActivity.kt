@@ -18,8 +18,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -172,7 +170,7 @@ fun MyEmiApp() {
                         NavigationBarItem(
                             selected = false,
                             onClick = { screen = "history" },
-                            icon = { Icon(Icons.Default.History, null) },
+                            icon = { Icon(Icons.Default.Home, null) },
                             label = { Text("History") }
                         )
                     }
@@ -219,7 +217,7 @@ fun Dashboard(vm: EmiViewModel, onHistory: () -> Unit) {
             ) {
                 Column(Modifier.padding(20.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.PhoneAndroid, null, Modifier.size(32.dp))
+                        Icon(Icons.Default.Home, null, Modifier.size(32.dp))
                         Spacer(Modifier.width(12.dp))
                         Column {
                             Text(plan.phoneName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -275,7 +273,7 @@ fun Dashboard(vm: EmiViewModel, onHistory: () -> Unit) {
 
         item {
             OutlinedButton(onClick = onHistory, Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.History, null)
+                Icon(Icons.Default.Home, null)
                 Spacer(Modifier.width(8.dp))
                 Text("View Payment History")
             }
