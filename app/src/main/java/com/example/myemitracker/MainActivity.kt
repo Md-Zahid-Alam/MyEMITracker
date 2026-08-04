@@ -47,6 +47,8 @@ import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -59,6 +61,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -140,7 +143,8 @@ data class Loan(
     val startDate: Long,
     val dueDay: Int,
     val reminderDays: List<Int>,
-    val payments: List<Payment>
+    val payments: List<Payment>,
+    val repaymentMode: String = "EQUAL"
 )
 
 data class Debt(
@@ -535,6 +539,7 @@ class FinanceRepository(private val context: Context) {
 
             put("installments", item.installments)
             put("monthlyPayment", item.monthlyPayment)
+            put("repaymentMode", item.repaymentMode)
 
             put("startDate", item.startDate)
             put("dueDay", item.dueDay)
@@ -738,6 +743,10 @@ class FinanceRepository(private val context: Context) {
                             "monthlyPayment",
                             0.0
                         ),
+                        repaymentMode = item.optString(
+                            "repaymentMode",
+                            "EQUAL"
+                        ).ifBlank { "EQUAL" },
                         startDate = item.optLong(
                             "startDate",
                             System.currentTimeMillis()
@@ -1384,7 +1393,9 @@ fun financeViewModel(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FinanceApp(
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onPasswordChange: (String) -> Unit,
+    verifyPassword: (String) -> Boolean
 ) {
 
     val context =
@@ -1462,6 +1473,14 @@ fun FinanceApp(
                 },
 
                 actions = {
+
+                    TextButton(
+                        onClick = {
+                            selectedType = "password"
+                        }
+                    ) {
+                        Text("Password")
+                    }
 
                     IconButton(
                         onClick = {
@@ -1630,6 +1649,17 @@ fun FinanceApp(
                         done = {
                             selectedType = ""
                             selectedId = ""
+                        }
+                    )
+                }
+
+                selectedType == "password" -> {
+
+                    ChangePasswordForm(
+                        onChange = onPasswordChange,
+                        verifyCurrent = verifyPassword,
+                        done = {
+                            selectedType = ""
                         }
                     )
                 }
@@ -2593,7 +2623,7 @@ fun EmiForm(
         }
 
         Field(
-            "Reminder days, comma separated (0=due date)",
+            "Reminder days before due date (e.g. 7,3,1,0)",
             reminders
         ) {
             reminders = it
@@ -2694,9 +2724,12 @@ fun EmiForm(
                             ?.minOfOrNull {
                                 it.dueDate
                             }
-                            ?: dueDate(
-                                System.currentTimeMillis(),
-                                day
+                            ?: addMonths(
+                                dueDate(
+                                    System.currentTimeMillis(),
+                                    day
+                                ),
+                                -previous
                             )
 
                     val oldPaid =
@@ -2900,6 +2933,18 @@ fun LoanForm(
         )
     }
 
+    var repaymentMode by remember {
+        mutableStateOf(existing?.repaymentMode ?: "EQUAL")
+    }
+
+    var flexibleMonthlyPayment by remember {
+        mutableStateOf(
+            if (existing?.repaymentMode == "FLEXIBLE") {
+                existing.monthlyPayment.toString()
+            } else ""
+        )
+    }
+
     var dueDay by remember {
         mutableStateOf(
             existing?.dueDay?.toString()
@@ -2960,11 +3005,26 @@ fun LoanForm(
             ?: 0
 
     val monthly =
-        if (count > 0) {
+        if (repaymentMode == "EQUAL" && count > 0) {
             total / count
         } else {
             0.0
         }
+
+    val flexibleMonthly = flexibleMonthlyPayment.toDoubleOrNull() ?: 0.0
+    val scheduledAmounts =
+        if (repaymentMode == "FLEXIBLE" && flexibleMonthly > 0) {
+            buildList {
+                var remaining = total
+                while (remaining > 0.0001) {
+                    val amount = minOf(flexibleMonthly, remaining)
+                    add(amount)
+                    remaining -= amount
+                }
+            }
+        } else List(count.coerceAtLeast(0)) { monthly }
+    val scheduleCount = scheduledAmounts.size
+    val displayedMonthly = if (repaymentMode == "FLEXIBLE") flexibleMonthly else monthly
 
     FormColumn(
         title =
@@ -3017,11 +3077,27 @@ fun LoanForm(
             interest = it
         }
 
-        Field(
-            "Installments",
-            installments
+        ChoiceDropdown(
+            label = "Repayment method",
+            value = if (repaymentMode == "FLEXIBLE") {
+                "Flexible Monthly Payment"
+            } else {
+                "Equal Installments"
+            },
+            options = listOf(
+                "Equal Installments",
+                "Flexible Monthly Payment"
+            )
         ) {
-            installments = it
+            repaymentMode = if (it == "Flexible Monthly Payment") "FLEXIBLE" else "EQUAL"
+        }
+
+        if (repaymentMode == "EQUAL") {
+            Field("Installments", installments) { installments = it }
+        } else {
+            Field("Planned monthly payment", flexibleMonthlyPayment) {
+                flexibleMonthlyPayment = it
+            }
         }
 
         Field(
@@ -3039,7 +3115,7 @@ fun LoanForm(
         }
 
         Field(
-            "Reminder days, comma separated",
+            "Reminder days before due date (e.g. 7,3,1,0)",
             reminders
         ) {
             reminders = it
@@ -3070,8 +3146,17 @@ fun LoanForm(
                 )
 
                 Text(
-                    "Monthly: ${money(monthly)}"
+                    if (repaymentMode == "FLEXIBLE") {
+                        "Planned monthly payment: ${money(displayedMonthly)}"
+                    } else {
+                        "Monthly: ${money(displayedMonthly)}"
+                    }
                 )
+
+                if (repaymentMode == "FLEXIBLE" && scheduledAmounts.isNotEmpty()) {
+                    Text("Calculated payments: $scheduleCount")
+                    Text("Final payment: ${money(scheduledAmounts.last())}")
+                }
             }
         }
 
@@ -3104,10 +3189,13 @@ fun LoanForm(
                     principalAmount <= 0 ->
                         "Enter principal."
 
-                    count <= 0 ->
+                    repaymentMode == "EQUAL" && count <= 0 ->
                         "Enter installments."
 
-                    previousCount !in 0..count ->
+                    repaymentMode == "FLEXIBLE" && flexibleMonthly <= 0 ->
+                        "Enter a valid planned monthly payment."
+
+                    previousCount !in 0..scheduleCount ->
                         "Previous repayments must be 0 to total installments."
 
                     day !in 1..28 ->
@@ -3129,9 +3217,12 @@ fun LoanForm(
                             ?.minOfOrNull {
                                 it.dueDate
                             }
-                            ?: dueDate(
-                                System.currentTimeMillis(),
-                                day
+                            ?: addMonths(
+                                dueDate(
+                                    System.currentTimeMillis(),
+                                    day
+                                ),
+                                -previousCount
                             )
 
                     val oldPaid =
@@ -3146,7 +3237,9 @@ fun LoanForm(
                             ?: emptyMap()
 
                     val payments =
-                        (1..count).map { number ->
+                        scheduledAmounts.mapIndexed { index, amount ->
+
+                            val number = index + 1
 
                             Payment(
 
@@ -3158,8 +3251,7 @@ fun LoanForm(
                                         number - 1
                                     ),
 
-                                amount =
-                                    monthly,
+                                amount = amount,
 
                                 paidDate =
                                     oldPaid[number]
@@ -3205,10 +3297,12 @@ fun LoanForm(
                                 total,
 
                             installments =
-                                count,
+                                scheduleCount,
 
                             monthlyPayment =
-                                monthly,
+                                displayedMonthly,
+
+                            repaymentMode = repaymentMode,
 
                             startDate =
                                 existing?.startDate
@@ -3333,12 +3427,12 @@ fun DebtForm(
             name = it
         }
 
-        Field(
-            "Direction (I Owe / Owed to Me)",
-            direction
-        ) {
-            direction = it
-        }
+        ChoiceDropdown(
+            label = "Direction",
+            value = direction,
+            options = listOf("I Owe", "Owed to Me"),
+            onSelect = { direction = it }
+        )
 
         Field(
             "Original amount",
@@ -3552,6 +3646,77 @@ fun DebtForm(
 // ============================================================
 // FORM COMPONENTS
 // ============================================================
+
+@Composable
+fun ChangePasswordForm(
+    onChange: (String) -> Unit,
+    verifyCurrent: (String) -> Boolean,
+    done: () -> Unit
+) {
+    var current by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+
+    FormColumn("Change Password") {
+        Text("Your new password replaces the old one securely.")
+        Field("Current password", current) { current = it }
+        Field("New password", newPassword) { newPassword = it }
+        Field("Confirm new password", confirm) { confirm = it }
+        if (error.isNotEmpty()) {
+            Text(error, color = MaterialTheme.colorScheme.error)
+        }
+        Button(
+            onClick = {
+                error = when {
+                    current.isBlank() -> "Enter your current password."
+                    !verifyCurrent(current) -> "Current password is incorrect."
+                    newPassword.length < 6 -> "Use at least 6 characters."
+                    newPassword != confirm -> "New passwords do not match."
+                    else -> ""
+                }
+                if (error.isEmpty()) {
+                    onChange(newPassword)
+                    done()
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Change Password") }
+        OutlinedButton(onClick = done, modifier = Modifier.fillMaxWidth()) {
+            Text("Cancel")
+        }
+    }
+}
+
+@Composable
+fun ChoiceDropdown(
+    label: String,
+    value: String,
+    options: List<String>,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box(modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("$label: $value") }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            options.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onSelect(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
 
 @Composable
 fun FormColumn(
@@ -4325,12 +4490,16 @@ class MainActivity : ComponentActivity() {
 
             } else {
 
-                FinanceApp {
-
-                    unlocked = false
-
-                    showContent()
-                }
+                FinanceApp(
+                    onLogout = {
+                        unlocked = false
+                        showContent()
+                    },
+                    onPasswordChange = { password ->
+                        security.setPassword(password)
+                    },
+                    verifyPassword = { password -> security.verify(password) }
+                )
             }
         }
     }
