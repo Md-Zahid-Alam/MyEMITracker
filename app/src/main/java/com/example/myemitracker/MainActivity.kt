@@ -539,8 +539,6 @@ class FinanceRepository(private val context: Context) {
 
             put("installments", item.installments)
             put("monthlyPayment", item.monthlyPayment)
-            put("repaymentMode", item.repaymentMode)
-
             put("startDate", item.startDate)
             put("dueDay", item.dueDay)
 
@@ -578,6 +576,7 @@ class FinanceRepository(private val context: Context) {
 
             put("installments", item.installments)
             put("monthlyPayment", item.monthlyPayment)
+            put("repaymentMode", item.repaymentMode)
 
             put("startDate", item.startDate)
             put("dueDay", item.dueDay)
@@ -743,10 +742,6 @@ class FinanceRepository(private val context: Context) {
                             "monthlyPayment",
                             0.0
                         ),
-                        repaymentMode = item.optString(
-                            "repaymentMode",
-                            "EQUAL"
-                        ).ifBlank { "EQUAL" },
                         startDate = item.optLong(
                             "startDate",
                             System.currentTimeMillis()
@@ -830,6 +825,10 @@ class FinanceRepository(private val context: Context) {
                             "monthlyPayment",
                             0.0
                         ),
+                        repaymentMode = item.optString(
+                            "repaymentMode",
+                            "EQUAL"
+                        ).ifBlank { "EQUAL" },
                         startDate = item.optLong(
                             "startDate",
                             System.currentTimeMillis()
