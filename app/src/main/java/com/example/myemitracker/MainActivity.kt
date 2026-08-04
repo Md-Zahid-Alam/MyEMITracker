@@ -2,7 +2,7 @@ package com.example.myemitracker
 
 import android.Manifest
 import android.app.AlarmManager
-import android.app.BroadcastReceiver
+import android.content.BroadcastReceiver
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -20,6 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -1114,7 +1116,7 @@ class ReminderReceiver : BroadcastReceiver() {
 // ============================================================
 
 class FinanceViewModel(
-    context: Context
+    private val context: Context
 ) : ViewModel() {
 
     private val repository =
@@ -1379,6 +1381,7 @@ fun financeViewModel(
 // MAIN APP
 // ============================================================
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FinanceApp(
     onLogout: () -> Unit
@@ -4307,13 +4310,16 @@ class MainActivity : ComponentActivity() {
 
             } else if (!unlocked) {
 
-                LockScreen {
+                LockScreen { password ->
 
-                    if (security.verify(it)) {
+                    if (security.verify(password)) {
 
                         unlocked = true
 
                         showContent()
+                        true
+                    } else {
+                        false
                     }
                 }
 
@@ -4494,7 +4500,7 @@ fun SetupScreen(
 
 @Composable
 fun LockScreen(
-    onUnlock: (String) -> Unit
+    onUnlock: (String) -> Boolean
 ) {
 
     var password by remember {
@@ -4595,10 +4601,11 @@ fun LockScreen(
 
                 } else {
 
-                    onUnlock(password)
-
-                    error =
-                        "Incorrect password."
+                    if (onUnlock(password)) {
+                        error = ""
+                    } else {
+                        error = "Incorrect password."
+                    }
                 }
             },
 
