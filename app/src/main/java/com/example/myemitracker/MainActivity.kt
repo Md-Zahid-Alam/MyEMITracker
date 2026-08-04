@@ -1,2512 +1,805 @@
 package com.example.myemitracker
 
 import android.Manifest
-import android.app.AlarmManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
+import android.app.*
+import android.content.*
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.Build
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
 import android.os.Bundle
+import android.os.Build
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Restore
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.OutputStream
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import java.util.UUID
+import java.util.*
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 import kotlin.math.max
 
-private const val CHANNEL_ID = "emi_reminders"
-private const val PREFS = "emi_v2_data"
-private const val KEY_PLANS = "plans"
+private const val PREFS = "finance_tracker_v3"
+private const val KEY_DATA = "data"
+private const val KEY_PASSWORD_HASH = "password_hash"
+private const val KEY_PASSWORD_SALT = "password_salt"
+private const val KEY_BIOMETRIC = "biometric_enabled"
+private const val CHANNEL_ID = "finance_reminders"
 
-// -------------------- Data --------------------
-
-data class EmiPayment(
-    val installment: Int,
+data class Payment(
+    val number: Int,
     val dueDate: Long,
     val amount: Double,
-    val paidDate: Long? = null
+    val paidDate: Long? = null,
+    val status: String = if (paidDate == null) "PENDING" else "PAID"
 )
 
-data class EmiPlan(
+data class EmiItem(
     val id: String = UUID.randomUUID().toString(),
-    val phoneName: String,
+    val name: String,
+    val category: String,
+    val seller: String,
     val price: Double,
     val downPayment: Double,
+    val financedAmount: Double,
+    val interestRate: Double,
+    val interestAmount: Double,
+    val totalPayable: Double,
     val installments: Int,
-    val monthlyEmi: Double,
-    val dueDay: Int,
+    val monthlyPayment: Double,
     val startDate: Long,
-    val payments: List<EmiPayment>
+    val dueDay: Int,
+    val reminderDays: List<Int>,
+    val payments: List<Payment>
 )
 
-// -------------------- Date / formatting helpers --------------------
+data class Loan(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val type: String,
+    val lender: String,
+    val principal: Double,
+    val interestRate: Double,
+    val interestAmount: Double,
+    val totalPayable: Double,
+    val installments: Int,
+    val monthlyPayment: Double,
+    val startDate: Long,
+    val dueDay: Int,
+    val reminderDays: List<Int>,
+    val payments: List<Payment>
+)
 
-fun money(value: Double): String =
-    "৳" + NumberFormat.getNumberInstance(Locale.US).format(value)
+data class Debt(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val direction: String,
+    val originalAmount: Double,
+    val dueDate: Long?,
+    val notes: String,
+    val payments: List<Payment>
+)
 
-fun dateText(time: Long): String =
-    SimpleDateFormat("dd MMM yyyy", Locale.US).format(Date(time))
+data class FinanceData(
+    val emis: List<EmiItem> = emptyList(),
+    val loans: List<Loan> = emptyList(),
+    val debts: List<Debt> = emptyList()
+)
 
-fun dateTimeText(time: Long): String =
-    SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US).format(Date(time))
+fun money(v: Double): String = "৳" + NumberFormat.getNumberInstance(Locale.US).format(v)
+fun dateText(v: Long): String = SimpleDateFormat("dd MMM yyyy", Locale.US).format(Date(v))
+fun dateTimeText(v: Long): String = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US).format(Date(v))
 
-fun firstDueDate(start: Long, dueDay: Int): Long {
-    val base = Calendar.getInstance().apply {
+fun addMonths(time: Long, months: Int): Long =
+    Calendar.getInstance().apply { timeInMillis = time; add(Calendar.MONTH, months) }.timeInMillis
+
+fun dueDate(start: Long, dueDay: Int): Long {
+    val c = Calendar.getInstance().apply {
         timeInMillis = start
-        set(Calendar.HOUR_OF_DAY, 9)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
+        set(Calendar.HOUR_OF_DAY, 9); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
         set(Calendar.DAY_OF_MONTH, 1)
     }
-
-    val candidate = base.clone() as Calendar
-    candidate.set(Calendar.DAY_OF_MONTH, dueDay.coerceIn(1, 28))
-
-    if (candidate.timeInMillis < start) {
-        candidate.add(Calendar.MONTH, 1)
-    }
-
-    return candidate.timeInMillis
-}
-
-fun addMonths(date: Long, months: Int): Long {
-    val c = Calendar.getInstance().apply {
-        timeInMillis = date
-    }
-
-    c.add(Calendar.MONTH, months)
-
+    c.set(Calendar.DAY_OF_MONTH, dueDay.coerceIn(1, 28))
+    if (c.timeInMillis < start) c.add(Calendar.MONTH, 1)
     return c.timeInMillis
 }
 
-// -------------------- Notification scheduling --------------------
+fun parseReminders(text: String): List<Int> =
+    text.split(",").mapNotNull { it.trim().toIntOrNull() }.filter { it in 0..30 }.distinct().sortedDescending()
 
-object EmiNotificationScheduler {
-
-    fun schedulePlan(
-        context: Context,
-        plan: EmiPlan
-    ) {
-        cancelPlan(context, plan)
-
-        plan.payments
-            .filter { it.paidDate == null }
-            .forEach { payment ->
-
-                schedule(
-                    context = context,
-                    plan = plan,
-                    payment = payment,
-                    dueDay = false
-                )
-
-                schedule(
-                    context = context,
-                    plan = plan,
-                    payment = payment,
-                    dueDay = true
-                )
-            }
-    }
-
-    private fun schedule(
-        context: Context,
-        plan: EmiPlan,
-        payment: EmiPayment,
-        dueDay: Boolean
-    ) {
-        val alarmManager =
-            context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        val reminderTime =
-            if (dueDay) {
-                payment.dueDate
-            } else {
-                payment.dueDate -
-                        24L * 60L * 60L * 1000L
-            }
-
-        if (reminderTime <= System.currentTimeMillis()) {
-            return
-        }
-
-        val intent =
-            Intent(
-                context,
-                EmiReminderReceiver::class.java
-            ).apply {
-
-                putExtra(
-                    "planId",
-                    plan.id
-                )
-
-                putExtra(
-                    "phoneName",
-                    plan.phoneName
-                )
-
-                putExtra(
-                    "amount",
-                    payment.amount
-                )
-
-                putExtra(
-                    "installment",
-                    payment.installment
-                )
-
-                putExtra(
-                    "dueDate",
-                    payment.dueDate
-                )
-
-                putExtra(
-                    "isDue",
-                    dueDay
-                )
-            }
-
-        val requestCode =
-            plan.id.hashCode() * 31 +
-                    payment.installment * 2 +
-                    if (dueDay) 1 else 0
-
-        val pending =
-            PendingIntent.getBroadcast(
-                context,
-                requestCode,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or
-                        PendingIntent.FLAG_IMMUTABLE
-            )
-
-        alarmManager.setAndAllowWhileIdle(
-            AlarmManager.RTC_WAKEUP,
-            reminderTime,
-            pending
-        )
-    }
-
-    fun cancelPlan(
-        context: Context,
-        plan: EmiPlan
-    ) {
-        val alarmManager =
-            context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-        plan.payments.forEach { payment ->
-
-            for (dueDay in listOf(false, true)) {
-
-                val requestCode =
-                    plan.id.hashCode() * 31 +
-                            payment.installment * 2 +
-                            if (dueDay) 1 else 0
-
-                val intent =
-                    Intent(
-                        context,
-                        EmiReminderReceiver::class.java
-                    )
-
-                val pending =
-                    PendingIntent.getBroadcast(
-                        context,
-                        requestCode,
-                        intent,
-                        PendingIntent.FLAG_NO_CREATE or
-                                PendingIntent.FLAG_IMMUTABLE
-                    )
-
-                if (pending != null) {
-                    alarmManager.cancel(pending)
-                    pending.cancel()
-                }
-            }
-        }
-    }
-
-    fun rescheduleAll(
-        context: Context,
-        plans: List<EmiPlan>
-    ) {
-        plans.forEach {
-            schedulePlan(context, it)
-        }
-    }
+fun hashPassword(password: String, salt: ByteArray): ByteArray {
+    val spec = PBEKeySpec(password.toCharArray(), salt, 120_000, 256)
+    return SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded
 }
 
-// -------------------- Notification Receiver --------------------
+fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+fun unhex(s: String): ByteArray = ByteArray(s.length / 2) { s.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
 
-class EmiReminderReceiver : BroadcastReceiver() {
+class SecurityStore(private val context: Context) {
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    override fun onReceive(
-        context: Context,
-        intent: Intent
-    ) {
+    fun hasPassword() = prefs.contains(KEY_PASSWORD_HASH)
 
-        val phoneName =
-            intent.getStringExtra("phoneName")
-                ?: "Phone EMI"
-
-        val amount =
-            intent.getDoubleExtra(
-                "amount",
-                0.0
-            )
-
-        val installment =
-            intent.getIntExtra(
-                "installment",
-                1
-            )
-
-        val dueDate =
-            intent.getLongExtra(
-                "dueDate",
-                System.currentTimeMillis()
-            )
-
-        val isDue =
-            intent.getBooleanExtra(
-                "isDue",
-                false
-            )
-
-        createNotificationChannel(context)
-
-        val title =
-            if (isDue) {
-                "EMI Due Today"
-            } else {
-                "EMI Reminder"
-            }
-
-        val text =
-            if (isDue) {
-                "$phoneName: ${money(amount)} is due today (installment $installment)."
-            } else {
-                "$phoneName: ${money(amount)} is due tomorrow (installment $installment)."
-            }
-
-        if (
-            Build.VERSION.SDK_INT < 33 ||
-            context.checkSelfPermission(
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-
-            val notification =
-                NotificationCompat.Builder(
-                    context,
-                    CHANNEL_ID
-                )
-                    .setSmallIcon(
-                        android.R.drawable.ic_dialog_info
-                    )
-                    .setContentTitle(title)
-                    .setContentText(text)
-                    .setStyle(
-                        NotificationCompat.BigTextStyle()
-                            .bigText(
-                                "$text\nDue date: ${dateText(dueDate)}"
-                            )
-                    )
-                    .setPriority(
-                        NotificationCompat.PRIORITY_DEFAULT
-                    )
-                    .setAutoCancel(true)
-                    .build()
-
-            NotificationManagerCompat
-                .from(context)
-                .notify(
-                    (intent.getStringExtra("planId")
-                        ?: "").hashCode() +
-                            installment +
-                            if (isDue) 10000 else 0,
-                    notification
-                )
-        }
-    }
-}
-
-fun createNotificationChannel(
-    context: Context
-) {
-    if (Build.VERSION.SDK_INT >= 26) {
-
-        val channel =
-            NotificationChannel(
-                CHANNEL_ID,
-                "EMI Reminders",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description =
-                    "Reminders for upcoming and due phone EMIs"
-            }
-
-        context
-            .getSystemService(
-                NotificationManager::class.java
-            )
-            .createNotificationChannel(channel)
-    }
-}
-
-// -------------------- Storage --------------------
-
-class EmiRepository(
-    private val context: Context
-) {
-
-    private val prefs =
-        context.getSharedPreferences(
-            PREFS,
-            Context.MODE_PRIVATE
-        )
-
-    fun loadPlans(): List<EmiPlan> {
-
-        val raw =
-            prefs.getString(
-                KEY_PLANS,
-                "[]"
-            ) ?: "[]"
-
-        return runCatching {
-
-            val array =
-                JSONArray(raw)
-
-            buildList {
-
-                for (i in 0 until array.length()) {
-
-                    add(
-                        fromJson(
-                            array.getJSONObject(i)
-                        )
-                    )
-                }
-            }
-
-        }.getOrDefault(emptyList())
-    }
-
-    fun savePlans(
-        plans: List<EmiPlan>
-    ) {
-
-        val array = JSONArray()
-
-        plans.forEach {
-            array.put(
-                toJson(it)
-            )
-        }
-
-        prefs
-            .edit()
-            .putString(
-                KEY_PLANS,
-                array.toString()
-            )
+    fun setPassword(password: String) {
+        val salt = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        prefs.edit()
+            .putString(KEY_PASSWORD_SALT, hex(salt))
+            .putString(KEY_PASSWORD_HASH, hex(hashPassword(password, salt)))
             .apply()
     }
 
-    fun backupJson(): String =
-        JSONArray().apply {
-
-            loadPlans().forEach {
-                put(toJson(it))
-            }
-
-        }.toString(2)
-
-    fun restoreJson(
-        json: String
-    ): List<EmiPlan> {
-
-        val array =
-            JSONArray(json)
-
-        val restored =
-            buildList {
-
-                for (i in 0 until array.length()) {
-
-                    add(
-                        fromJson(
-                            array.getJSONObject(i)
-                        )
-                    )
-                }
-            }
-
-        savePlans(restored)
-
-        return restored
+    fun verify(password: String): Boolean {
+        val saltText = prefs.getString(KEY_PASSWORD_SALT, null) ?: return false
+        val hashText = prefs.getString(KEY_PASSWORD_HASH, null) ?: return false
+        val actual = hashPassword(password, unhex(saltText))
+        return MessageDigest.isEqual(actual, unhex(hashText))
     }
 
-    private fun toJson(
-        plan: EmiPlan
-    ): JSONObject =
-        JSONObject().apply {
+    fun biometricEnabled() = prefs.getBoolean(KEY_BIOMETRIC, false)
+    fun setBiometricEnabled(v: Boolean) = prefs.edit().putBoolean(KEY_BIOMETRIC, v).apply()
+}
 
-            put(
-                "id",
-                plan.id
-            )
+class FinanceRepository(private val context: Context) {
+    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-            put(
-                "phoneName",
-                plan.phoneName
-            )
+    fun load(): FinanceData {
+        val raw = prefs.getString(KEY_DATA, null)
+        if (!raw.isNullOrBlank()) return fromJson(raw)
+        return migrateV2()
+    }
 
-            put(
-                "price",
-                plan.price
-            )
+    fun save(data: FinanceData) {
+        prefs.edit().putString(KEY_DATA, toJson(data).toString()).apply()
+    }
 
-            put(
-                "downPayment",
-                plan.downPayment
-            )
+    fun backup(): String = toJson(load()).toString(2)
 
-            put(
-                "installments",
-                plan.installments
-            )
+    fun restore(json: String): FinanceData {
+        val d = fromJson(json)
+        save(d)
+        return d
+    }
 
-            put(
-                "monthlyEmi",
-                plan.monthlyEmi
-            )
-
-            put(
-                "dueDay",
-                plan.dueDay
-            )
-
-            put(
-                "startDate",
-                plan.startDate
-            )
-
-            put(
-                "payments",
-                JSONArray().apply {
-
-                    plan.payments.forEach { p ->
-
-                        put(
-                            JSONObject().apply {
-
-                                put(
-                                    "installment",
-                                    p.installment
-                                )
-
-                                put(
-                                    "dueDate",
-                                    p.dueDate
-                                )
-
-                                put(
-                                    "amount",
-                                    p.amount
-                                )
-
-                                put(
-                                    "paidDate",
-                                    p.paidDate
-                                        ?: JSONObject.NULL
-                                )
-                            }
-                        )
+    private fun migrateV2(): FinanceData {
+        val old = context.getSharedPreferences("emi_v2_data", Context.MODE_PRIVATE)
+        val raw = old.getString("plans", null) ?: return FinanceData()
+        return runCatching {
+            val arr = JSONArray(raw)
+            val emis = buildList {
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    val pArr = o.optJSONArray("payments") ?: JSONArray()
+                    val payments = buildList {
+                        for (j in 0 until pArr.length()) {
+                            val p = pArr.getJSONObject(j)
+                            add(Payment(
+                                p.optInt("installment", j + 1),
+                                p.optLong("dueDate", System.currentTimeMillis()),
+                                p.optDouble("amount", 0.0),
+                                if (p.isNull("paidDate")) null else p.optLong("paidDate")
+                            ))
+                        }
                     }
-                }
-            )
-        }
-
-    private fun fromJson(
-        obj: JSONObject
-    ): EmiPlan {
-
-        val paymentsJson =
-            obj.optJSONArray(
-                "payments"
-            ) ?: JSONArray()
-
-        val payments =
-            buildList {
-
-                for (
-                    i in 0 until paymentsJson.length()
-                ) {
-
-                    val p =
-                        paymentsJson.getJSONObject(i)
-
-                    add(
-                        EmiPayment(
-                            installment =
-                                p.getInt(
-                                    "installment"
-                                ),
-
-                            dueDate =
-                                p.getLong(
-                                    "dueDate"
-                                ),
-
-                            amount =
-                                p.getDouble(
-                                    "amount"
-                                ),
-
-                            paidDate =
-                                if (
-                                    p.isNull(
-                                        "paidDate"
-                                    )
-                                ) {
-                                    null
-                                } else {
-                                    p.getLong(
-                                        "paidDate"
-                                    )
-                                }
-                        )
-                    )
+                    val price = o.optDouble("price", 0.0)
+                    val down = o.optDouble("downPayment", 0.0)
+                    val monthly = o.optDouble("monthlyEmi", 0.0)
+                    add(EmiItem(
+                        id = o.optString("id", UUID.randomUUID().toString()),
+                        name = o.optString("phoneName", "Imported EMI"),
+                        category = "Imported from Version 2",
+                        seller = "",
+                        price = price,
+                        downPayment = down,
+                        financedAmount = max(0.0, price - down),
+                        interestRate = 0.0,
+                        interestAmount = 0.0,
+                        totalPayable = price,
+                        installments = o.optInt("installments", payments.size),
+                        monthlyPayment = monthly,
+                        startDate = o.optLong("startDate", System.currentTimeMillis()),
+                        dueDay = o.optInt("dueDay", 1),
+                        reminderDays = listOf(1, 0),
+                        payments = payments
+                    ))
                 }
             }
+            FinanceData(emis = emis)
+        }.getOrDefault(FinanceData())
+    }
 
-        return EmiPlan(
+    private fun toJson(d: FinanceData) = JSONObject().apply {
+        put("version", 3)
+        put("emis", JSONArray().apply { d.emis.forEach { put(emiJson(it)) } })
+        put("loans", JSONArray().apply { d.loans.forEach { put(loanJson(it)) } })
+        put("debts", JSONArray().apply { d.debts.forEach { put(debtJson(it)) } })
+    }
 
-            id =
-                obj.optString(
-                    "id",
-                    UUID.randomUUID().toString()
-                ),
+    private fun emiJson(x: EmiItem) = JSONObject().apply {
+        put("id", x.id); put("name", x.name); put("category", x.category); put("seller", x.seller)
+        put("price", x.price); put("downPayment", x.downPayment); put("financedAmount", x.financedAmount)
+        put("interestRate", x.interestRate); put("interestAmount", x.interestAmount); put("totalPayable", x.totalPayable)
+        put("installments", x.installments); put("monthlyPayment", x.monthlyPayment); put("startDate", x.startDate)
+        put("dueDay", x.dueDay); put("reminderDays", JSONArray(x.reminderDays))
+        put("payments", JSONArray().apply { x.payments.forEach { put(paymentJson(it)) } })
+    }
 
-            phoneName =
-                obj.optString(
-                    "phoneName",
-                    "Phone"
-                ),
+    private fun loanJson(x: Loan) = JSONObject().apply {
+        put("id", x.id); put("name", x.name); put("type", x.type); put("lender", x.lender)
+        put("principal", x.principal); put("interestRate", x.interestRate); put("interestAmount", x.interestAmount)
+        put("totalPayable", x.totalPayable); put("installments", x.installments); put("monthlyPayment", x.monthlyPayment)
+        put("startDate", x.startDate); put("dueDay", x.dueDay); put("reminderDays", JSONArray(x.reminderDays))
+        put("payments", JSONArray().apply { x.payments.forEach { put(paymentJson(it)) } })
+    }
 
-            price =
-                obj.optDouble(
-                    "price",
-                    0.0
-                ),
+    private fun debtJson(x: Debt) = JSONObject().apply {
+        put("id", x.id); put("name", x.name); put("direction", x.direction)
+        put("originalAmount", x.originalAmount); put("dueDate", x.dueDate ?: JSONObject.NULL)
+        put("notes", x.notes); put("payments", JSONArray().apply { x.payments.forEach { put(paymentJson(it)) } })
+    }
 
-            downPayment =
-                obj.optDouble(
-                    "downPayment",
-                    0.0
-                ),
+    private fun paymentJson(p: Payment) = JSONObject().apply {
+        put("number", p.number); put("dueDate", p.dueDate); put("amount", p.amount)
+        put("paidDate", p.paidDate ?: JSONObject.NULL); put("status", p.status)
+    }
 
-            installments =
-                obj.optInt(
-                    "installments",
-                    payments.size
-                ),
-
-            monthlyEmi =
-                obj.optDouble(
-                    "monthlyEmi",
-                    0.0
-                ),
-
-            dueDay =
-                obj.optInt(
-                    "dueDay",
-                    1
-                ).coerceIn(1, 28),
-
-            startDate =
-                obj.optLong(
-                    "startDate",
-                    System.currentTimeMillis()
-                ),
-
-            payments =
-                payments
-        )
+    private fun fromJson(raw: String): FinanceData {
+        val o = JSONObject(raw)
+        fun payments(a: JSONArray?) = buildList {
+            val x = a ?: JSONArray()
+            for (i in 0 until x.length()) {
+                val p = x.getJSONObject(i)
+                add(Payment(p.optInt("number", i + 1), p.optLong("dueDate"), p.optDouble("amount"),
+                    if (p.isNull("paidDate")) null else p.optLong("paidDate")))
+            }
+        }
+        val emis = buildList {
+            val a = o.optJSONArray("emis") ?: JSONArray()
+            for (i in 0 until a.length()) {
+                val x = a.getJSONObject(i)
+                val r = x.optJSONArray("reminderDays") ?: JSONArray()
+                add(EmiItem(
+                    x.optString("id", UUID.randomUUID().toString()), x.optString("name", "EMI"),
+                    x.optString("category", "Other"), x.optString("seller", ""), x.optDouble("price"),
+                    x.optDouble("downPayment"), x.optDouble("financedAmount"), x.optDouble("interestRate"),
+                    x.optDouble("interestAmount"), x.optDouble("totalPayable"), x.optInt("installments"),
+                    x.optDouble("monthlyPayment"), x.optLong("startDate"), x.optInt("dueDay", 1),
+                    buildList { for (j in 0 until r.length()) add(r.optInt(j)) },
+                    payments(x.optJSONArray("payments"))
+                ))
+            }
+        }
+        val loans = buildList {
+            val a = o.optJSONArray("loans") ?: JSONArray()
+            for (i in 0 until a.length()) {
+                val x = a.getJSONObject(i)
+                val r = x.optJSONArray("reminderDays") ?: JSONArray()
+                add(Loan(
+                    x.optString("id", UUID.randomUUID().toString()), x.optString("name", "Loan"),
+                    x.optString("type", "Other"), x.optString("lender", ""), x.optDouble("principal"),
+                    x.optDouble("interestRate"), x.optDouble("interestAmount"), x.optDouble("totalPayable"),
+                    x.optInt("installments"), x.optDouble("monthlyPayment"), x.optLong("startDate"),
+                    x.optInt("dueDay", 1), buildList { for (j in 0 until r.length()) add(r.optInt(j)) },
+                    payments(x.optJSONArray("payments"))
+                ))
+            }
+        }
+        val debts = buildList {
+            val a = o.optJSONArray("debts") ?: JSONArray()
+            for (i in 0 until a.length()) {
+                val x = a.getJSONObject(i)
+                add(Debt(
+                    x.optString("id", UUID.randomUUID().toString()), x.optString("name", "Debt"),
+                    x.optString("direction", "I Owe"), x.optDouble("originalAmount"),
+                    if (x.isNull("dueDate")) null else x.optLong("dueDate"), x.optString("notes"),
+                    payments(x.optJSONArray("payments"))
+                ))
+            }
+        }
+        return FinanceData(emis, loans, debts)
     }
 }
 
-// -------------------- ViewModel --------------------
-
-class EmiViewModel(
-    private val context: Context
-) : ViewModel() {
-
-    private val repo =
-        EmiRepository(
-            context.applicationContext
-        )
-
-    var plans by mutableStateOf(
-        repo.loadPlans()
-    )
-        private set
-
-    fun addPlan(
-        name: String,
-        price: Double,
-        down: Double,
-        count: Int,
-        dueDay: Int
-    ) {
-
-        val monthly =
-            max(
-                0.0,
-                price - down
-            ) / count
-
-        val start =
-            System.currentTimeMillis()
-
-        val firstDue =
-            firstDueDate(
-                start,
-                dueDay
-            )
-
-        val payments =
-            (1..count).map { i ->
-
-                EmiPayment(
-                    installment = i,
-                    dueDate =
-                        addMonths(
-                            firstDue,
-                            i - 1
-                        ),
-                    amount = monthly
-                )
+object ReminderScheduler {
+    fun reschedule(context: Context, data: FinanceData) {
+        val am = context.getSystemService(AlarmManager::class.java)
+        data.emis.forEach { item ->
+            item.payments.filter { it.paidDate == null }.forEach { p ->
+                item.reminderDays.forEach { days -> schedule(context, am, item.name, p, days) }
             }
-
-        val plan =
-            EmiPlan(
-                phoneName = name.trim(),
-                price = price,
-                downPayment = down,
-                installments = count,
-                monthlyEmi = monthly,
-                dueDay = dueDay,
-                startDate = start,
-                payments = payments
-            )
-
-        plans =
-            plans + plan
-
-        repo.savePlans(plans)
-
-        EmiNotificationScheduler.schedulePlan(
-            context,
-            plan
-        )
+        }
+        data.loans.forEach { item ->
+            item.payments.filter { it.paidDate == null }.forEach { p ->
+                item.reminderDays.forEach { days -> schedule(context, am, item.name, p, days) }
+            }
+        }
     }
 
-    fun updatePlan(
-        old: EmiPlan,
-        name: String,
-        price: Double,
-        down: Double,
-        count: Int,
-        dueDay: Int
-    ) {
-
-        EmiNotificationScheduler.cancelPlan(
-            context,
-            old
-        )
-
-        val monthly =
-            max(
-                0.0,
-                price - down
-            ) / count
-
-        val firstDue =
-            firstDueDate(
-                old.startDate,
-                dueDay
-            )
-
-        val oldPaid =
-            old.payments
-                .filter {
-                    it.paidDate != null
-                }
-                .associateBy {
-                    it.installment
-                }
-
-        val payments =
-            (1..count).map { i ->
-
-                EmiPayment(
-                    installment = i,
-                    dueDate =
-                        addMonths(
-                            firstDue,
-                            i - 1
-                        ),
-                    amount = monthly,
-                    paidDate =
-                        oldPaid[i]?.paidDate
-                )
-            }
-
-        val updated =
-            old.copy(
-                phoneName = name.trim(),
-                price = price,
-                downPayment = down,
-                installments = count,
-                monthlyEmi = monthly,
-                dueDay = dueDay,
-                payments = payments
-            )
-
-        plans =
-            plans.map {
-                if (it.id == old.id) {
-                    updated
-                } else {
-                    it
-                }
-            }
-
-        repo.savePlans(plans)
-
-        EmiNotificationScheduler.schedulePlan(
-            context,
-            updated
-        )
+    private fun schedule(context: Context, am: AlarmManager, name: String, p: Payment, days: Int) {
+        val whenAt = p.dueDate - days * 24L * 60L * 60L * 1000L
+        if (whenAt <= System.currentTimeMillis()) return
+        val intent = Intent(context, ReminderReceiver::class.java).apply {
+            putExtra("name", name); putExtra("amount", p.amount); putExtra("number", p.number)
+            putExtra("due", p.dueDate); putExtra("days", days)
+        }
+        val code = (name.hashCode() * 31 + p.number * 37 + days)
+        val pi = PendingIntent.getBroadcast(context, code, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenAt, pi)
     }
-
-    fun markPaid(
-        planId: String,
-        installment: Int
-    ) {
-
-        plans =
-            plans.map { plan ->
-
-                if (plan.id != planId) {
-
-                    plan
-
-                } else {
-
-                    plan.copy(
-                        payments =
-                            plan.payments.map { p ->
-
-                                if (
-                                    p.installment ==
-                                    installment &&
-                                    p.paidDate == null
-                                ) {
-
-                                    p.copy(
-                                        paidDate =
-                                            System.currentTimeMillis()
-                                    )
-
-                                } else {
-                                    p
-                                }
-                            }
-                    )
-                }
-            }
-
-        repo.savePlans(plans)
-
-        plans
-            .firstOrNull {
-                it.id == planId
-            }
-            ?.let { plan ->
-
-                EmiNotificationScheduler
-                    .cancelPlan(
-                        context,
-                        plan
-                    )
-
-                EmiNotificationScheduler
-                    .schedulePlan(
-                        context,
-                        plan
-                    )
-            }
-    }
-
-    fun delete(
-        plan: EmiPlan
-    ) {
-
-        EmiNotificationScheduler
-            .cancelPlan(
-                context,
-                plan
-            )
-
-        plans =
-            plans.filterNot {
-                it.id == plan.id
-            }
-
-        repo.savePlans(plans)
-    }
-
-    fun backup(): String =
-        repo.backupJson()
-
-    fun restore(
-        json: String
-    ): Boolean =
-        runCatching {
-
-            plans.forEach {
-                EmiNotificationScheduler
-                    .cancelPlan(
-                        context,
-                        it
-                    )
-            }
-
-            plans =
-                repo.restoreJson(json)
-
-            EmiNotificationScheduler
-                .rescheduleAll(
-                    context,
-                    plans
-                )
-
-        }.isSuccess
 }
 
-@Composable
-fun getVm(
-    context: Context
-): EmiViewModel =
-    viewModel(
-        factory =
-            object :
-                androidx.lifecycle.ViewModelProvider.Factory {
-
-                override fun <T : ViewModel>
-                        create(
-                            modelClass: Class<T>
-                        ): T {
-
-                    @Suppress(
-                        "UNCHECKED_CAST"
-                    )
-
-                    return EmiViewModel(
-                        context.applicationContext
-                    ) as T
-                }
-            }
-    )
-
-// -------------------- Main UI --------------------
-
-@OptIn(
-    androidx.compose.material3.ExperimentalMaterial3Api::class
-)
-@Composable
-fun MyEmiApp() {
-
-    val context =
-        androidx.compose.ui.platform.LocalContext.current
-
-    val vm =
-        getVm(context)
-
-    var screen by remember {
-        mutableStateOf("home")
-    }
-
-    var selectedPlanId by remember {
-        mutableStateOf<String?>(null)
-    }
-
-    var showDelete by remember {
-        mutableStateOf<EmiPlan?>(null)
-    }
-
-    var message by remember {
-        mutableStateOf("")
-    }
-
-    val backupLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.CreateDocument(
-                "application/json"
+class ReminderReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val name = intent.getStringExtra("name") ?: "Payment"
+        val amount = intent.getDoubleExtra("amount", 0.0)
+        val number = intent.getIntExtra("number", 1)
+        val due = intent.getLongExtra("due", System.currentTimeMillis())
+        val days = intent.getIntExtra("days", 0)
+        if (Build.VERSION.SDK_INT >= 26) {
+            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+                NotificationChannel(CHANNEL_ID, "Finance Reminders", NotificationManager.IMPORTANCE_DEFAULT)
             )
-        ) { uri: Uri? ->
-
-            if (uri != null) {
-
-                runCatching {
-
-                    context.contentResolver
-                        .openOutputStream(uri)
-                        ?.use {
-
-                            it.write(
-                                vm.backup()
-                                    .toByteArray()
-                            )
-                        }
-
-                    message =
-                        "Backup saved successfully."
-
-                }.onFailure {
-
-                    message =
-                        "Could not save backup: ${it.message}"
-                }
-            }
         }
-
-    val restoreLauncher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.OpenDocument()
-        ) { uri: Uri? ->
-
-            if (uri != null) {
-
-                runCatching {
-
-                    val json =
-                        context.contentResolver
-                            .openInputStream(uri)
-                            ?.bufferedReader()
-                            ?.use {
-                                it.readText()
-                            }
-                            ?: error(
-                                "Empty file"
-                            )
-
-                    if (vm.restore(json)) {
-
-                        message =
-                            "Backup restored successfully."
-
-                    } else {
-
-                        message =
-                            "Invalid backup file."
-                    }
-
-                }.onFailure {
-
-                    message =
-                        "Could not restore backup: ${it.message}"
-                }
-            }
-        }
-
-    MaterialTheme(
-        colorScheme =
-            lightColorScheme()
-    ) {
-
-        Scaffold(
-
-            topBar = {
-
-                TopAppBar(
-
-                    title = {
-                        Text(
-                            "My EMI Tracker",
-                            fontWeight =
-                                FontWeight.Bold
-                        )
-                    },
-
-                    navigationIcon = {
-
-                        if (screen != "home") {
-
-                            IconButton(
-                                onClick = {
-                                    screen = "home"
-                                }
-                            ) {
-
-                                Icon(
-                                    Icons.Default.ArrowBack,
-                                    "Back"
-                                )
-                            }
-                        }
-                    },
-
-                    actions = {
-
-                        if (screen == "home") {
-
-                            IconButton(
-                                onClick = {
-                                    backupLauncher
-                                        .launch(
-                                            "my-emi-tracker-backup.json"
-                                        )
-                                }
-                            ) {
-
-                                Icon(
-                                    Icons.Default.Backup,
-                                    "Backup"
-                                )
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    restoreLauncher
-                                        .launch(
-                                            arrayOf(
-                                                "application/json",
-                                                "text/plain",
-                                                "*/*"
-                                            )
-                                        )
-                                }
-                            ) {
-
-                                Icon(
-                                    Icons.Default.Restore,
-                                    "Restore"
-                                )
-                            }
-                        }
-                    }
-                )
-            },
-
-            bottomBar = {
-
-                if (screen == "home") {
-
-                    NavigationBar {
-
-                        NavigationBarItem(
-                            selected = true,
-                            onClick = {
-                                screen = "home"
-                            },
-                            icon = {
-                                Icon(
-                                    Icons.Default.Home,
-                                    null
-                                )
-                            },
-                            label = {
-                                Text(
-                                    "Dashboard"
-                                )
-                            }
-                        )
-
-                        NavigationBarItem(
-                            selected = false,
-                            onClick = {
-                                screen = "plans"
-                            },
-                            icon = {
-                                Icon(
-                                    Icons.Default.Home,
-                                    null
-                                )
-                            },
-                            label = {
-                                Text(
-                                    "EMI Plans"
-                                )
-                            }
-                        )
-                    }
-                }
-            },
-
-            floatingActionButton = {
-
-                if (
-                    screen == "home" ||
-                    screen == "plans"
-                ) {
-
-                    FloatingActionButton(
-                        onClick = {
-
-                            selectedPlanId = null
-                            screen = "add"
-                        }
-                    ) {
-
-                        Icon(
-                            Icons.Default.Add,
-                            "Add EMI"
-                        )
-                    }
-                }
-            }
-
-        ) { padding ->
-
-            Box(
-                Modifier
-                    .padding(padding)
-                    .fillMaxSize()
-            ) {
-
-                when (screen) {
-
-                    "home" -> {
-
-                        Dashboard(
-                            vm = vm,
-                            onAdd = {
-                                screen = "add"
-                            },
-                            onPlan = {
-                                selectedPlanId = it.id
-                                screen = "details"
-                            }
-                        )
-                    }
-
-                    "plans" -> {
-
-                        PlansScreen(
-                            vm = vm,
-                            onPlan = {
-                                selectedPlanId = it.id
-                                screen = "details"
-                            },
-                            onAdd = {
-                                screen = "add"
-                            }
-                        )
-                    }
-
-                    "details" -> {
-
-                        vm.plans
-                            .firstOrNull {
-                                it.id == selectedPlanId
-                            }
-                            ?.let { plan ->
-
-                                PlanDetails(
-                                    plan = plan,
-                                    vm = vm,
-                                    onEdit = {
-
-                                        selectedPlanId =
-                                            plan.id
-
-                                        screen = "edit"
-                                    },
-                                    onBack = {
-                                        screen = "home"
-                                    },
-                                    onDelete = {
-                                        showDelete = plan
-                                    }
-                                )
-
-                            } ?: run {
-
-                            screen = "home"
-                        }
-                    }
-
-                    "add" -> {
-
-                        AddEditScreen(
-                            vm = vm,
-                            existing = null
-                        ) {
-                            screen = "home"
-                        }
-                    }
-
-                    "edit" -> {
-
-                        vm.plans
-                            .firstOrNull {
-                                it.id == selectedPlanId
-                            }
-                            ?.let { plan ->
-
-                                AddEditScreen(
-                                    vm = vm,
-                                    existing = plan
-                                ) {
-                                    screen = "details"
-                                }
-                            }
-                    }
-                }
-
-                if (message.isNotEmpty()) {
-
-                    Card(
-                        Modifier
-                            .align(
-                                Alignment.BottomCenter
-                            )
-                            .padding(16.dp)
-                    ) {
-
-                        Row(
-                            Modifier.padding(16.dp),
-                            verticalAlignment =
-                                Alignment.CenterVertically
-                        ) {
-
-                            Text(
-                                message,
-                                Modifier.weight(1f)
-                            )
-
-                            Text(
-                                "OK",
-                                fontWeight =
-                                    FontWeight.Bold,
-                                modifier =
-                                    Modifier.padding(
-                                        start = 12.dp
-                                    )
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        showDelete?.let { plan ->
-
-            AlertDialog(
-
-                onDismissRequest = {
-                    showDelete = null
-                },
-
-                title = {
-                    Text(
-                        "Delete EMI plan?"
-                    )
-                },
-
-                text = {
-                    Text(
-                        "Delete ${plan.phoneName} and its payment history? Scheduled reminders will also be removed."
-                    )
-                },
-
-                confirmButton = {
-
-                    Button(
-                        onClick = {
-
-                            vm.delete(plan)
-
-                            showDelete = null
-
-                            screen = "home"
-                        }
-                    ) {
-
-                        Text("Delete")
-                    }
-                },
-
-                dismissButton = {
-
-                    OutlinedButton(
-                        onClick = {
-                            showDelete = null
-                        }
-                    ) {
-
-                        Text("Cancel")
-                    }
-                }
-            )
+        if (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            val title = if (days == 0) "Payment Due Today" else "Payment Reminder"
+            val body = if (days == 0) "$name: ${money(amount)} is due today (payment $number)." else "$name: ${money(amount)} is due in $days day(s)."
+            val n = NotificationCompat.Builder(context, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle(title).setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText("$body\nDue: ${dateText(due)}"))
+                .setAutoCancel(true).setPriority(NotificationCompat.PRIORITY_DEFAULT).build()
+            NotificationManagerCompat.from(context).notify((name.hashCode() + number + days * 101), n)
         }
     }
 }
 
-// -------------------- Dashboard --------------------
+class FinanceViewModel(private val context: Context) : ViewModel() {
+    private val repo = FinanceRepository(context.applicationContext)
+    var data by mutableStateOf(repo.load()); private set
+
+    fun save(d: FinanceData) { data = d; repo.save(d); ReminderScheduler.reschedule(context, d) }
+
+    fun addEmi(x: EmiItem) = save(data.copy(emis = data.emis + x))
+    fun updateEmi(x: EmiItem) = save(data.copy(emis = data.emis.map { if (it.id == x.id) x else it }))
+    fun deleteEmi(id: String) = save(data.copy(emis = data.emis.filterNot { it.id == id }))
+
+    fun addLoan(x: Loan) = save(data.copy(loans = data.loans + x))
+    fun updateLoan(x: Loan) = save(data.copy(loans = data.loans.map { if (it.id == x.id) x else it }))
+    fun deleteLoan(id: String) = save(data.copy(loans = data.loans.filterNot { it.id == id }))
+
+    fun addDebt(x: Debt) = save(data.copy(debts = data.debts + x))
+    fun updateDebt(x: Debt) = save(data.copy(debts = data.debts.map { if (it.id == x.id) x else it }))
+    fun deleteDebt(id: String) = save(data.copy(debts = data.debts.filterNot { it.id == id }))
+
+    fun markEmiPaid(id: String, number: Int) {
+        data.emis.firstOrNull { it.id == id }?.let { x ->
+            val updated = x.copy(payments = x.payments.map { if (it.number == number && it.paidDate == null) it.copy(paidDate = System.currentTimeMillis()) else it })
+            updateEmi(updated)
+        }
+    }
+
+    fun markLoanPaid(id: String, number: Int) {
+        data.loans.firstOrNull { it.id == id }?.let { x ->
+            val updated = x.copy(payments = x.payments.map { if (it.number == number && it.paidDate == null) it.copy(paidDate = System.currentTimeMillis()) else it })
+            updateLoan(updated)
+        }
+    }
+
+    fun markDebtPaid(id: String, amount: Double) {
+        data.debts.firstOrNull { it.id == id }?.let { x ->
+            val nextNo = (x.payments.maxOfOrNull { it.number } ?: 0) + 1
+            val updated = x.copy(payments = x.payments + Payment(nextNo, System.currentTimeMillis(), amount, System.currentTimeMillis()))
+            updateDebt(updated)
+        }
+    }
+
+    fun backup() = repo.backup()
+    fun restore(json: String) { save(repo.restore(json)) }
+}
 
 @Composable
-fun Dashboard(
-    vm: EmiViewModel,
-    onAdd: () -> Unit,
-    onPlan: (EmiPlan) -> Unit
-) {
+fun vm(context: Context): FinanceViewModel = viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(c: Class<T>): T {
+        @Suppress("UNCHECKED_CAST") return FinanceViewModel(context.applicationContext) as T
+    }
+})
 
-    val plans = vm.plans
+@Composable
+fun FinanceApp(onLogout: () -> Unit) {
+    val context = LocalContext.current
+    val v = vm(context)
+    var tab by remember { mutableStateOf(0) }
+    var selectedType by remember { mutableStateOf("") }
+    var selectedId by remember { mutableStateOf("") }
+    var editing by remember { mutableStateOf(false) }
 
-    val totalMonthly =
-        plans.sumOf {
-            it.monthlyEmi
-        }
+    val backupLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(v.backup().toByteArray()) }
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { v.restore(it.readText()) }
+    }
 
-    val totalRemaining =
-        plans.sumOf { p ->
-            p.payments
-                .filter {
-                    it.paidDate == null
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("My Finance Tracker", fontWeight = FontWeight.Bold) },
+                actions = {
+                    IconButton(onClick = { backupLauncher.launch("my-finance-tracker-backup.json") }) { Icon(Icons.Default.Backup, "Backup") }
+                    IconButton(onClick = { restoreLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) }) { Icon(Icons.Default.Restore, "Restore") }
+                    IconButton(onClick = onLogout) { Icon(Icons.Default.Lock, "Lock") }
                 }
-                .sumOf {
-                    it.amount
-                }
-        }
-
-    val totalPaid =
-        plans.sumOf { p ->
-            p.payments
-                .filter {
-                    it.paidDate != null
-                }
-                .sumOf {
-                    it.amount
-                }
-        }
-
-    val next =
-        plans
-            .flatMap { p ->
-                p.payments
-                    .filter {
-                        it.paidDate == null
-                    }
-                    .map {
-                        p to it
-                    }
-            }
-            .minByOrNull {
-                it.second.dueDate
-            }
-
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding =
-            PaddingValues(16.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(14.dp)
-    ) {
-
-        item {
-
-            Card(
-                Modifier.fillMaxWidth(),
-                shape =
-                    RoundedCornerShape(20.dp)
-            ) {
-
-                Column(
-                    Modifier.padding(20.dp)
-                ) {
-
-                    Text(
-                        "Total EMI / Month",
-                        style =
-                            MaterialTheme.typography
-                                .labelLarge
-                    )
-
-                    Text(
-                        money(totalMonthly),
-                        style =
-                            MaterialTheme.typography
-                                .headlineMedium,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Spacer(
-                        Modifier.height(14.dp)
-                    )
-
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement =
-                            Arrangement.spacedBy(10.dp)
-                    ) {
-
-                        StatCard(
-                            "Total Paid",
-                            money(totalPaid),
-                            Modifier.weight(1f)
-                        )
-
-                        StatCard(
-                            "Remaining",
-                            money(totalRemaining),
-                            Modifier.weight(1f)
-                        )
-                    }
-                }
-            }
-        }
-
-        item {
-
-            Card(
-                Modifier.fillMaxWidth()
-            ) {
-
-                Column(
-                    Modifier.padding(18.dp)
-                ) {
-
-                    Text(
-                        "Next Payment",
-                        style =
-                            MaterialTheme.typography
-                                .titleMedium,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Spacer(
-                        Modifier.height(6.dp)
-                    )
-
-                    if (next != null) {
-
-                        Text(
-                            next.first.phoneName,
-                            style =
-                                MaterialTheme.typography
-                                    .titleMedium
-                        )
-
-                        Text(
-                            money(
-                                next.second.amount
-                            ),
-                            style =
-                                MaterialTheme.typography
-                                    .headlineSmall
-                        )
-
-                        Text(
-                            "Installment ${next.second.installment} • " +
-                                    dateText(
-                                        next.second.dueDate
-                                    )
-                        )
-
-                        Spacer(
-                            Modifier.height(10.dp)
-                        )
-
-                        Button(
-                            onClick = {
-
-                                vm.markPaid(
-                                    next.first.id,
-                                    next.second.installment
-                                )
-                            },
-                            modifier =
-                                Modifier.fillMaxWidth()
-                        ) {
-
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                null
-                            )
-
-                            Spacer(
-                                Modifier.width(8.dp)
-                            )
-
-                            Text(
-                                "Mark as Paid"
-                            )
-                        }
-
-                    } else {
-
-                        Text(
-                            "No pending EMIs. 🎉"
-                        )
-                    }
-                }
-            }
-        }
-
-        item {
-
-            Text(
-                "Your EMI Plans",
-                style =
-                    MaterialTheme.typography
-                        .titleLarge,
-                fontWeight =
-                    FontWeight.Bold
             )
-        }
-
-        if (plans.isEmpty()) {
-
-            item {
-
-                Card(
-                    Modifier.fillMaxWidth()
-                ) {
-
-                    Column(
-                        Modifier.padding(20.dp),
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally
-                    ) {
-
-                        Text(
-                            "No EMI plans yet"
-                        )
-
-                        Spacer(
-                            Modifier.height(10.dp)
-                        )
-
-                        Button(
-                            onClick = onAdd
-                        ) {
-
-                            Icon(
-                                Icons.Default.Add,
-                                null
-                            )
-
-                            Spacer(
-                                Modifier.width(8.dp)
-                            )
-
-                            Text(
-                                "Add Your First EMI"
-                            )
-                        }
-                    }
+        },
+        bottomBar = {
+            NavigationBar {
+                listOf("Dashboard", "EMI", "Loans", "Debts", "Reports").forEachIndexed { i, label ->
+                    NavigationBarItem(selected = tab == i, onClick = { tab = i }, icon = {
+                        Icon(if (i == 0) Icons.Default.Home else if (i == 1) Icons.Default.Devices else if (i == 2) Icons.Default.AccountBalance else if (i == 3) Icons.Default.CreditCard else Icons.Default.Description, null)
+                    }, label = { Text(label) })
                 }
             }
+        },
+        floatingActionButton = {
+            if (tab in 1..3) FloatingActionButton(onClick = { selectedType = when(tab){1->"emi";2->"loan";else->"debt"}; selectedId=""; editing=false }) { Icon(Icons.Default.Add, "Add") }
+        }
+    ) { p ->
+        Box(Modifier.padding(p).fillMaxSize()) {
+            when {
+                selectedType == "emi" -> EmiForm(v, v.data.emis.find { it.id == selectedId }, { selectedType="" })
+                selectedType == "loan" -> LoanForm(v, v.data.loans.find { it.id == selectedId }, { selectedType="" })
+                selectedType == "debt" -> DebtForm(v, v.data.debts.find { it.id == selectedId }, { selectedType="" })
+                else -> when(tab) {
+                    0 -> Dashboard(v)
+                    1 -> EmiList(v, { selectedId=it; selectedType="emi" }, { selectedType="emi"; selectedId="" })
+                    2 -> LoanList(v, { selectedId=it; selectedType="loan" }, { selectedType="loan"; selectedId="" })
+                    3 -> DebtList(v, { selectedId=it; selectedType="debt" }, { selectedType="debt"; selectedId="" })
+                    else -> Reports(v)
+                }
+            }
+        }
+    }
+}
 
+@Composable
+fun Dashboard(v: FinanceViewModel) {
+    val emiRemain = v.data.emis.sumOf { it.payments.filter { p -> p.paidDate == null }.sumOf { p -> p.amount } }
+    val loanRemain = v.data.loans.sumOf { it.payments.filter { p -> p.paidDate == null }.sumOf { p -> p.amount } }
+    val debtRemain = v.data.debts.sumOf { d -> max(0.0, d.originalAmount - d.payments.sumOf { it.amount }) }
+    val monthly = v.data.emis.sumOf { it.monthlyPayment } + v.data.loans.sumOf { it.monthlyPayment }
+    val next = (v.data.emis.flatMap { x -> x.payments.filter { it.paidDate == null }.map { Triple(x.name, it.dueDate, it.amount) } } +
+            v.data.loans.flatMap { x -> x.payments.filter { it.paidDate == null }.map { Triple(x.name, it.dueDate, it.amount) } })
+        .minByOrNull { it.second }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { Text("Financial Overview", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SummaryCard("Monthly", money(monthly), Modifier.weight(1f))
+            SummaryCard("EMI Left", money(emiRemain), Modifier.weight(1f))
+        }}
+        item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SummaryCard("Loan Left", money(loanRemain), Modifier.weight(1f))
+            SummaryCard("Debt Left", money(debtRemain), Modifier.weight(1f))
+        }}
+        item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(18.dp)) {
+            Text("Next Payment", fontWeight=FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            if (next == null) Text("No pending EMI or loan payments.")
+            else { Text(next.first, style=MaterialTheme.typography.titleMedium); Text(money(next.third), style=MaterialTheme.typography.headlineSmall); Text("Due ${dateText(next.second)}") }
+        }}}
+    }
+}
+
+@Composable
+fun SummaryCard(title: String, value: String, m: Modifier) {
+    Card(m) { Column(Modifier.padding(14.dp)) { Text(title, style=MaterialTheme.typography.labelMedium); Text(value, fontWeight=FontWeight.Bold) } }
+}
+
+@Composable
+fun EmiList(v: FinanceViewModel, onOpen:(String)->Unit, onAdd:()->Unit) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding=PaddingValues(16.dp), verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        item { Text("EMI Plans", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold) }
+        if (v.data.emis.isEmpty()) item { Text("No EMI plans yet. Tap + to add one.") }
+        items(v.data.emis) { x ->
+            Card(Modifier.fillMaxWidth(), onClick={onOpen(x.id)}) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(x.name, style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
+                    Text("${x.category} • ${money(x.monthlyPayment)} / month")
+                    val paid=x.payments.count{it.paidDate!=null}
+                    Text("$paid/${x.installments} paid • Remaining ${money(x.payments.filter{it.paidDate==null}.sumOf{it.amount})}")
+                    LinearProgressIndicator(progress={if(x.installments==0)0f else paid.toFloat()/x.installments}, Modifier.fillMaxWidth().padding(top=8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LoanList(v: FinanceViewModel, onOpen:(String)->Unit, onAdd:()->Unit) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding=PaddingValues(16.dp), verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        item { Text("Loans", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold) }
+        if(v.data.loans.isEmpty()) item { Text("No loans yet. Tap + to add one.") }
+        items(v.data.loans) { x ->
+            Card(Modifier.fillMaxWidth(), onClick={onOpen(x.id)}) { Column(Modifier.padding(16.dp)) {
+                Text(x.name, style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
+                Text("${x.type} • ${x.lender}")
+                Text("${money(x.monthlyPayment)} / month • ${x.payments.count{it.paidDate!=null}}/${x.installments} paid")
+                Text("Remaining ${money(x.payments.filter{it.paidDate==null}.sumOf{it.amount})}")
+            }}
+        }
+    }
+}
+
+@Composable
+fun DebtList(v: FinanceViewModel, onOpen:(String)->Unit, onAdd:()->Unit) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding=PaddingValues(16.dp), verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        item { Text("Debts", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold) }
+        if(v.data.debts.isEmpty()) item { Text("No debts yet. Tap + to add one.") }
+        items(v.data.debts) { x ->
+            val paid=x.payments.sumOf{it.amount}; val remain=max(0.0,x.originalAmount-paid)
+            Card(Modifier.fillMaxWidth(), onClick={onOpen(x.id)}) { Column(Modifier.padding(16.dp)) {
+                Text(x.name, style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
+                Text(x.direction)
+                Text("Original ${money(x.originalAmount)} • Paid ${money(paid)}")
+                Text("Remaining ${money(remain)}")
+                LinearProgressIndicator(progress={if(x.originalAmount<=0)0f else (paid/x.originalAmount).toFloat().coerceIn(0f,1f)}, Modifier.fillMaxWidth().padding(top=8.dp))
+            }}
+        }
+    }
+}
+
+@Composable
+fun PaymentHistory(payments: List<Payment>, onPaid: ((Int)->Unit)? = null) {
+    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        payments.forEach { p ->
+            Card(Modifier.fillMaxWidth()) { Row(Modifier.padding(12.dp), verticalAlignment=Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Payment ${p.number}", fontWeight=FontWeight.Bold)
+                    Text("Due ${dateText(p.dueDate)} • ${money(p.amount)}")
+                    if(p.paidDate!=null) Text("Paid ${dateTimeText(p.paidDate)}")
+                }
+                if(p.paidDate==null && onPaid!=null) Button(onClick={onPaid(p.number)}) { Text("Mark Paid") }
+                else if(p.paidDate!=null) Text("PAID", fontWeight=FontWeight.Bold, color=MaterialTheme.colorScheme.primary)
+            }}
+        }
+    }
+}
+
+@Composable
+fun EmiForm(v: FinanceViewModel, existing: EmiItem?, done:()->Unit) {
+    var name by remember{mutableStateOf(existing?.name?:"")}
+    var category by remember{mutableStateOf(existing?.category?:"Electronics")}
+    var seller by remember{mutableStateOf(existing?.seller?:"")}
+    var price by remember{mutableStateOf(existing?.price?.toString()?:"")}
+    var down by remember{mutableStateOf(existing?.downPayment?.toString()?:"0")}
+    var interestRate by remember{mutableStateOf(existing?.interestRate?.toString()?:"0")}
+    var interestAmount by remember{mutableStateOf(existing?.interestAmount?.toString()?:"0")}
+    var installments by remember{mutableStateOf(existing?.installments?.toString()?:"12")}
+    var dueDay by remember{mutableStateOf(existing?.dueDay?.toString()?:"10")}
+    var previousPaid by remember{mutableStateOf(existing?.payments?.count{it.paidDate!=null}?.toString()?:"0")}
+    var reminders by remember{mutableStateOf(existing?.reminderDays?.joinToString(",")?:"7,3,1,0")}
+    var error by remember{mutableStateOf("")}
+    val p=price.toDoubleOrNull()?:0.0; val d=down.toDoubleOrNull()?:0.0; val rate=interestRate.toDoubleOrNull()?:0.0
+    val fin=max(0.0,p-d); val intAmt=if(interestAmount.toDoubleOrNull()!=null && interestAmount.toDoubleOrNull()!!>0) interestAmount.toDouble() else fin*rate/100.0
+    val total=fin+intAmt; val n=installments.toIntOrNull()?:0; val monthly=if(n>0)total/n else 0.0
+
+    FormColumn(title=if(existing==null)"Add EMI":"Edit EMI") {
+        Field("Item name",name){name=it}; Field("Category",category){category=it}; Field("Seller / Provider",seller){seller=it}
+        Field("Purchase price",price){price=it}; Field("Down payment",down){down=it}; Field("Interest rate % (optional)",interestRate){interestRate=it}
+        Field("Fixed interest amount (optional)",interestAmount){interestAmount=it}; Field("Installments",installments){installments=it}; Field("Monthly due day 1-28",dueDay){dueDay=it}
+        Field("Previous installments already paid",previousPaid){previousPaid=it}; Field("Reminder days, comma separated (0=due date)",reminders){reminders=it}
+        Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("Calculated",fontWeight=FontWeight.Bold);Text("Financed: ${money(fin)}");Text("Interest: ${money(intAmt)}");Text("Total payable: ${money(total)}");Text("Monthly: ${money(monthly)}")}}
+        if(error.isNotEmpty()) Text(error,color=MaterialTheme.colorScheme.error)
+        Button(onClick={
+            val nn=name.trim(); val count=n; val prev=previousPaid.toIntOrNull()?:0; val day=dueDay.toIntOrNull()?:0
+            error=when{nn.isEmpty()->"Enter item name.";p<=0->"Enter a valid price.";d<0||d>=p->"Check down payment.";count<=0->"Enter installments.";prev !in 0..count->"Previous paid must be 0 to total installments.";day !in 1..28->"Due day must be 1-28.";parseReminders(reminders).isEmpty()->"Enter at least one reminder day.";else->""}
+            if(error.isEmpty()){
+                val first=existing?.payments?.minOfOrNull{it.dueDate}?:dueDate(System.currentTimeMillis(),day)
+                val oldPaid=existing?.payments?.filter{it.paidDate!=null}?.associateBy{it.number}?:emptyMap()
+                val pays=(1..count).map{i->Payment(i,addMonths(first,i-1),monthly,oldPaid[i]?.paidDate ?: if(existing==null && i<=prev) System.currentTimeMillis() else null)}
+                val x=EmiItem(existing?.id?:UUID.randomUUID().toString(),nn,category.trim(),seller.trim(),p,d,fin,rate,intAmt,total,count,monthly,existing?.startDate?:System.currentTimeMillis(),day,parseReminders(reminders),pays)
+                if(existing==null)v.addEmi(x) else v.updateEmi(x); done()
+            }
+        },Modifier.fillMaxWidth()){Text(if(existing==null)"Save EMI":"Update EMI")}
+        if(existing!=null){Text("Payment history",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold);PaymentHistory(existing.payments){v.markEmiPaid(existing.id,it)}}
+    }
+}
+
+@Composable
+fun LoanForm(v: FinanceViewModel, existing: Loan?, done:()->Unit) {
+    var name by remember{mutableStateOf(existing?.name?:"")}
+    var type by remember{mutableStateOf(existing?.type?:"Office Loan")}
+    var lender by remember{mutableStateOf(existing?.lender?:"")}
+    var principal by remember{mutableStateOf(existing?.principal?.toString()?:"")}
+    var rate by remember{mutableStateOf(existing?.interestRate?.toString()?:"0")}
+    var interest by remember{mutableStateOf(existing?.interestAmount?.toString()?:"0")}
+    var installments by remember{mutableStateOf(existing?.installments?.toString()?:"12")}
+    var day by remember{mutableStateOf(existing?.dueDay?.toString()?:"10")}
+    var prev by remember{mutableStateOf(existing?.payments?.count{it.paidDate!=null}?.toString()?:"0")}
+    var reminders by remember{mutableStateOf(existing?.reminderDays?.joinToString(",")?:"7,3,1,0")}
+    var error by remember{mutableStateOf("")}
+    val pr=principal.toDoubleOrNull()?:0.0; val rr=rate.toDoubleOrNull()?:0.0; val ia=interest.toDoubleOrNull()?:0.0
+    val interestAmt=if(ia>0)ia else pr*rr/100.0; val total=pr+interestAmt; val n=installments.toIntOrNull()?:0; val monthly=if(n>0)total/n else 0.0
+    FormColumn(if(existing==null)"Add Loan" else "Edit Loan"){
+        Field("Loan name",name){name=it};Field("Loan type",type){type=it};Field("Lender",lender){lender=it};Field("Principal amount",principal){principal=it}
+        Field("Interest rate %",rate){rate=it};Field("Fixed interest amount",interest){interest=it};Field("Installments",installments){installments=it};Field("Due day 1-28",day){day=it}
+        Field("Previous repayments already made",prev){prev=it};Field("Reminder days, comma separated",reminders){reminders=it}
+        Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("Calculated",fontWeight=FontWeight.Bold);Text("Interest: ${money(interestAmt)}");Text("Total payable: ${money(total)}");Text("Monthly: ${money(monthly)}")}}
+        if(error.isNotEmpty())Text(error,color=MaterialTheme.colorScheme.error)
+        Button(onClick={
+            val count=n;val pp=prev.toIntOrNull()?:0;val dd=day.toIntOrNull()?:0
+            error=when{name.isBlank()->"Enter loan name.";pr<=0->"Enter principal.";count<=0->"Enter installments.";pp !in 0..count->"Previous repayments must be 0 to total installments.";dd !in 1..28->"Due day must be 1-28.";parseReminders(reminders).isEmpty()->"Enter reminder days.";else->""}
+            if(error.isEmpty()){
+                val first=existing?.payments?.minOfOrNull{it.dueDate}?:dueDate(System.currentTimeMillis(),dd)
+                val oldPaid=existing?.payments?.filter{it.paidDate!=null}?.associateBy{it.number}?:emptyMap()
+                val pays=(1..count).map{i->Payment(i,addMonths(first,i-1),monthly,oldPaid[i]?.paidDate ?: if(existing==null&&i<=pp)System.currentTimeMillis() else null)}
+                val x=Loan(existing?.id?:UUID.randomUUID().toString(),name.trim(),type.trim(),lender.trim(),pr,rr,interestAmt,total,count,monthly,existing?.startDate?:System.currentTimeMillis(),dd,parseReminders(reminders),pays)
+                if(existing==null)v.addLoan(x) else v.updateLoan(x);done()
+            }
+        },Modifier.fillMaxWidth()){Text(if(existing==null)"Save Loan" else "Update Loan")}
+        if(existing!=null){Text("Repayment history",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold);PaymentHistory(existing.payments){v.markLoanPaid(existing.id,it)}}
+    }
+}
+
+@Composable
+fun DebtForm(v: FinanceViewModel, existing: Debt?, done:()->Unit) {
+    var name by remember{mutableStateOf(existing?.name?:"")}
+    var direction by remember{mutableStateOf(existing?.direction?:"I Owe")}
+    var amount by remember{mutableStateOf(existing?.originalAmount?.toString()?:"")}
+    var notes by remember{mutableStateOf(existing?.notes?:"")}
+    var payment by remember{mutableStateOf("")}
+    var error by remember{mutableStateOf("")}
+    FormColumn(if(existing==null)"Add Debt" else "Debt Details"){
+        Field("Person / organization",name){name=it};Field("Direction (I Owe / Owed to Me)",direction){direction=it};Field("Original amount",amount){amount=it};Field("Notes",notes){notes=it}
+        if(existing!=null){
+            val paid=existing.payments.sumOf{it.amount};val remain=max(0.0,(amount.toDoubleOrNull()?:existing.originalAmount)-paid)
+            Card(Modifier.fillMaxWidth()){Column(Modifier.padding(16.dp)){Text("Remaining: ${money(remain)}",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold);Text("Progress: ${if((amount.toDoubleOrNull()?:0.0)>0"%.1f".format(Locale.US,paid/(amount.toDouble()?:1.0)*100)else"0.0")}%")}}
+            Field("New payment amount",payment){payment=it}
+            Button(onClick={val a=payment.toDoubleOrNull()?:0.0;if(a>0)v.markDebtPaid(existing.id,a);payment="";},Modifier.fillMaxWidth()){Text("Add Payment")}
+            PaymentHistory(existing.payments)
         } else {
-
-            items(plans) { plan ->
-
-                PlanCard(
-                    plan = plan,
-                    onClick = {
-                        onPlan(plan)
-                    }
-                )
-            }
+            if(error.isNotEmpty())Text(error,color=MaterialTheme.colorScheme.error)
+            Button(onClick={val a=amount.toDoubleOrNull()?:0.0;if(name.isBlank()||a<=0){error="Enter a name and valid amount."}else{v.addDebt(Debt(name=name.trim(),direction=direction.trim(),originalAmount=a,dueDate=null,notes=notes.trim(),payments=emptyList()));done()}},Modifier.fillMaxWidth()){Text("Save Debt")}
         }
     }
 }
-
-// -------------------- EMI Plans --------------------
 
 @Composable
-fun PlansScreen(
-    vm: EmiViewModel,
-    onPlan: (EmiPlan) -> Unit,
-    onAdd: () -> Unit
-) {
-
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding =
-            PaddingValues(16.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(12.dp)
-    ) {
-
-        item {
-
-            Text(
-                "EMI Plans",
-                style =
-                    MaterialTheme.typography
-                        .headlineSmall,
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            Spacer(
-                Modifier.height(6.dp)
-            )
-
-            Text(
-                "Manage all of your phone EMI plans in one place."
-            )
-        }
-
-        items(vm.plans) { plan ->
-
-            PlanCard(
-                plan = plan,
-                onClick = {
-                    onPlan(plan)
-                }
-            )
-        }
-
-        item {
-
-            OutlinedButton(
-                onClick = onAdd,
-                modifier =
-                    Modifier.fillMaxWidth()
-            ) {
-
-                Icon(
-                    Icons.Default.Add,
-                    null
-                )
-
-                Spacer(
-                    Modifier.width(8.dp)
-                )
-
-                Text(
-                    "Add New EMI"
-                )
-            }
-        }
-    }
+fun FormColumn(title:String, content:@Composable ColumnScope.()->Unit){
+    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Text(title,style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)};item{Column(verticalArrangement=Arrangement.spacedBy(10.dp),content=content)}}
 }
-
-// -------------------- EMI Plan Card --------------------
 
 @Composable
-fun PlanCard(
-    plan: EmiPlan,
-    onClick: () -> Unit
-) {
-
-    val paid =
-        plan.payments.count {
-            it.paidDate != null
-        }
-
-    val progress =
-        if (plan.installments == 0) {
-            0f
-        } else {
-            paid.toFloat() /
-                    plan.installments.toFloat()
-        }
-
-    /*
-     * FIX:
-     *
-     * The previous version used:
-     *
-     * Card(
-     *     Modifier.fillMaxWidth(),
-     *     onClick = onClick
-     * )
-     *
-     * That is not compatible with the Material3
-     * Card version used by this project.
-     *
-     * We now use Modifier.clickable().
-     */
-
-    Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(
-                    onClick = onClick
-                )
-    ) {
-
-        Column(
-            Modifier.padding(18.dp)
-        ) {
-
-            Row(
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-
-                Icon(
-                    Icons.Default.Home,
-                    contentDescription = null,
-                    modifier =
-                        Modifier.size(30.dp)
-                )
-
-                Spacer(
-                    Modifier.width(10.dp)
-                )
-
-                Column(
-                    Modifier.weight(1f)
-                ) {
-
-                    Text(
-                        plan.phoneName,
-                        style =
-                            MaterialTheme.typography
-                                .titleLarge,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        "${money(plan.monthlyEmi)} / month • " +
-                                "Due day ${plan.dueDay}"
-                    )
-                }
-
-                Text(
-                    "$paid/${plan.installments}"
-                )
-            }
-
-            Spacer(
-                Modifier.height(12.dp)
-            )
-
-            LinearProgressIndicator(
-                progress = {
-                    progress
-                },
-                modifier =
-                    Modifier.fillMaxWidth()
-            )
-        }
-    }
+fun Field(label:String,value:String,onChange:(String)->Unit){
+    OutlinedTextField(value,onChange,label={Text(label)},modifier=Modifier.fillMaxWidth(),singleLine=true)
 }
-
-// -------------------- Plan Details --------------------
 
 @Composable
-fun PlanDetails(
-    plan: EmiPlan,
-    vm: EmiViewModel,
-    onEdit: () -> Unit,
-    onBack: () -> Unit,
-    onDelete: () -> Unit
-) {
-
-    val paid =
-        plan.payments.count {
-            it.paidDate != null
-        }
-
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding =
-            PaddingValues(16.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(12.dp)
-    ) {
-
-        item {
-
-            Card(
-                Modifier.fillMaxWidth()
-            ) {
-
-                Column(
-                    Modifier.padding(20.dp)
-                ) {
-
-                    Text(
-                        plan.phoneName,
-                        style =
-                            MaterialTheme.typography
-                                .headlineSmall,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        "Monthly EMI: ${money(plan.monthlyEmi)}"
-                    )
-
-                    Text(
-                        "Due day: ${plan.dueDay} of each month"
-                    )
-
-                    Text(
-                        "Progress: $paid/${plan.installments} paid"
-                    )
-
-                    Spacer(
-                        Modifier.height(12.dp)
-                    )
-
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement =
-                            Arrangement.spacedBy(8.dp)
-                    ) {
-
-                        Button(
-                            onClick = onEdit,
-                            modifier =
-                                Modifier.weight(1f)
-                        ) {
-
-                            Icon(
-                                Icons.Default.Edit,
-                                null
-                            )
-
-                            Spacer(
-                                Modifier.width(6.dp)
-                            )
-
-                            Text(
-                                "Edit"
-                            )
-                        }
-
-                        OutlinedButton(
-                            onClick = onDelete,
-                            modifier =
-                                Modifier.weight(1f)
-                        ) {
-
-                            Icon(
-                                Icons.Default.Delete,
-                                null
-                            )
-
-                            Spacer(
-                                Modifier.width(6.dp)
-                            )
-
-                            Text(
-                                "Delete"
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        item {
-
-            Text(
-                "Payment History",
-                style =
-                    MaterialTheme.typography
-                        .titleLarge,
-                fontWeight =
-                    FontWeight.Bold
-            )
-        }
-
-        items(plan.payments) { payment ->
-
-            Card(
-                Modifier.fillMaxWidth()
-            ) {
-
-                Row(
-                    Modifier.padding(16.dp),
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-
-                    Column(
-                        Modifier.weight(1f)
-                    ) {
-
-                        Text(
-                            "Installment ${payment.installment}",
-                            fontWeight =
-                                FontWeight.Bold
-                        )
-
-                        Text(
-                            "Due: ${dateText(payment.dueDate)}"
-                        )
-
-                        Text(
-                            money(payment.amount)
-                        )
-
-                        if (
-                            payment.paidDate != null
-                        ) {
-
-                            Text(
-                                "Paid: ${
-                                    dateTimeText(
-                                        payment.paidDate
-                                    )
-                                }"
-                            )
-                        }
-                    }
-
-                    if (
-                        payment.paidDate != null
-                    ) {
-
-                        Text(
-                            "PAID",
-                            color =
-                                MaterialTheme.colorScheme
-                                    .primary,
-                            fontWeight =
-                                FontWeight.Bold
-                        )
-
-                    } else {
-
-                        Button(
-                            onClick = {
-
-                                vm.markPaid(
-                                    plan.id,
-                                    payment.installment
-                                )
-                            }
-                        ) {
-
-                            Text(
-                                "Mark Paid"
-                            )
-                        }
-                    }
-                }
-            }
-        }
+fun Reports(v: FinanceViewModel) {
+    val context=LocalContext.current
+    var pending by remember { mutableStateOf("") }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null && pending.isNotEmpty()) writePdfToUri(context, uri, pending)
+        pending = ""
+    }
+    fun make(name:String, body:String){ pending=body; launcher.launch(name) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        Text("Reports",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+        Text("PDFs are generated locally. Save them in Downloads/Documents or another user-selected folder so they remain after uninstall.")
+        Button(onClick={make("Complete_Finance_Report.pdf",buildCompleteReport(v.data))},Modifier.fillMaxWidth()){Icon(Icons.Default.PictureAsPdf,null);Spacer(Modifier.width(8.dp));Text("Generate Complete Report")}
+        v.data.emis.forEach{x->OutlinedButton(onClick={make("EMI_${safe(x.name)}.pdf",buildEmiReport(x))},Modifier.fillMaxWidth()){Text("PDF: ${x.name}")}}
+        v.data.loans.forEach{x->OutlinedButton(onClick={make("Loan_${safe(x.name)}.pdf",buildLoanReport(x))},Modifier.fillMaxWidth()){Text("PDF: ${x.name}")}}
+        v.data.debts.forEach{x->OutlinedButton(onClick={make("Debt_${safe(x.name)}.pdf",buildDebtReport(x))},Modifier.fillMaxWidth()){Text("PDF: ${x.name}")}}
     }
 }
 
-// -------------------- Statistics --------------------
+fun safe(s:String)=s.replace(Regex("[^A-Za-z0-9_-]"),"_").take(40)
+
+fun buildCompleteReport(d:FinanceData)=buildString{
+    appendLine("MY FINANCE TRACKER — COMPLETE REPORT");appendLine("Generated: ${dateTimeText(System.currentTimeMillis())}");appendLine()
+    appendLine("EMI SUMMARY");appendLine("Plans: ${d.emis.size}");appendLine("Remaining: ${money(d.emis.sumOf{it.payments.filter{p->p.paidDate==null}.sumOf{p->p.amount}})}");appendLine()
+    appendLine("LOAN SUMMARY");appendLine("Loans: ${d.loans.size}");appendLine("Remaining: ${money(d.loans.sumOf{it.payments.filter{p->p.paidDate==null}.sumOf{p->p.amount}})}");appendLine()
+    appendLine("DEBT SUMMARY");appendLine("Debts: ${d.debts.size}");appendLine("Remaining: ${money(d.debts.sumOf{max(0.0,it.originalAmount-it.payments.sumOf{p->p.amount})})}");appendLine()
+    d.emis.forEach{appendLine();append(buildEmiReport(it))}
+    d.loans.forEach{appendLine();append(buildLoanReport(it))}
+    d.debts.forEach{appendLine();append(buildDebtReport(it))}
+}
+
+fun buildEmiReport(x:EmiItem)=buildString{
+    appendLine("EMI REPORT");appendLine("Item: ${x.name}");appendLine("Category: ${x.category}");appendLine("Seller: ${x.seller}")
+    appendLine("Price: ${money(x.price)}");appendLine("Down payment: ${money(x.downPayment)}");appendLine("Financed amount: ${money(x.financedAmount)}")
+    appendLine("Interest rate: ${x.interestRate}%");appendLine("Interest amount: ${money(x.interestAmount)}");appendLine("Total payable: ${money(x.totalPayable)}")
+    appendLine("Monthly payment: ${money(x.monthlyPayment)}");appendLine("Installments: ${x.installments}");appendLine("Due day: ${x.dueDay}")
+    appendLine("Reminder days: ${x.reminderDays.joinToString(", ")}");appendLine("Progress: ${x.payments.count{it.paidDate!=null}}/${x.installments}")
+    appendLine("Remaining: ${money(x.payments.filter{it.paidDate==null}.sumOf{it.amount})}");appendLine("PAYMENT HISTORY")
+    x.payments.forEach{appendLine("#${it.number} | Due ${dateText(it.dueDate)} | ${money(it.amount)} | ${if(it.paidDate==null)"PENDING" else "PAID ${dateText(it.paidDate)}"}")}
+}
+
+fun buildLoanReport(x:Loan)=buildString{
+    appendLine("LOAN REPORT");appendLine("Loan: ${x.name}");appendLine("Type: ${x.type}");appendLine("Lender: ${x.lender}")
+    appendLine("Principal: ${money(x.principal)}");appendLine("Interest rate: ${x.interestRate}%");appendLine("Interest: ${money(x.interestAmount)}");appendLine("Total payable: ${money(x.totalPayable)}")
+    appendLine("Monthly payment: ${money(x.monthlyPayment)}");appendLine("Installments: ${x.installments}");appendLine("Due day: ${x.dueDay}")
+    appendLine("Progress: ${x.payments.count{it.paidDate!=null}}/${x.installments}");appendLine("Remaining: ${money(x.payments.filter{it.paidDate==null}.sumOf{it.amount})}");appendLine("REPAYMENT HISTORY")
+    x.payments.forEach{appendLine("#${it.number} | Due ${dateText(it.dueDate)} | ${money(it.amount)} | ${if(it.paidDate==null)"PENDING" else "PAID ${dateText(it.paidDate)}"}")}
+}
+
+fun buildDebtReport(x:Debt)=buildString{
+    appendLine("DEBT REPORT");appendLine("Name: ${x.name}");appendLine("Direction: ${x.direction}");appendLine("Original amount: ${money(x.originalAmount)}")
+    appendLine("Paid: ${money(x.payments.sumOf{it.amount})}");appendLine("Remaining: ${money(max(0.0,x.originalAmount-x.payments.sumOf{it.amount}))}")
+    appendLine("Notes: ${x.notes}");appendLine("PAYMENT HISTORY");x.payments.forEach{appendLine("#${it.number} | ${dateTimeText(it.paidDate?:it.dueDate)} | ${money(it.amount)}")}
+}
+
+fun writePdfToUri(context:Context,uri:android.net.Uri,text:String){
+    context.contentResolver.openOutputStream(uri)?.use{out->
+        val doc=PdfDocument();val paint=Paint().apply{textSize=11f}
+        var pageNo=1;var page=doc.startPage(PdfDocument.PageInfo.Builder(595,842,pageNo).create());var canvas=page.canvas;var y=35f
+        text.lines().forEach{line->
+            if(y>810){doc.finishPage(page);pageNo++;page=doc.startPage(PdfDocument.PageInfo.Builder(595,842,pageNo).create());canvas=page.canvas;y=35f}
+            canvas.drawText(line.take(95),30f,y,paint);y+=16f
+        }
+        doc.finishPage(page);doc.writeTo(out);doc.close()
+    }
+}
+
+class MainActivity:ComponentActivity(){
+    private lateinit var security:SecurityStore
+    private var unlocked=false
+    override fun onCreate(savedInstanceState:Bundle?){
+        super.onCreate(savedInstanceState);security=SecurityStore(this)
+        showContent()
+    }
+    override fun onStop(){super.onStop();if(!isChangingConfigurations)unlocked=false}
+    private fun showContent(){setContent{if(!security.hasPassword())SetupScreen{security.setPassword(it);unlocked=true;showContent()}else if(!unlocked)LockScreen{if(security.verify(it)){unlocked=true;showContent()}}else FinanceApp{unlocked=false;showContent()}}}
+}
 
 @Composable
-fun StatCard(
-    title: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-
-    Card(
-        modifier
-    ) {
-
-        Column(
-            Modifier.padding(16.dp)
-        ) {
-
-            Text(
-                title,
-                style =
-                    MaterialTheme.typography
-                        .labelLarge
-            )
-
-            Spacer(
-                Modifier.height(4.dp)
-            )
-
-            Text(
-                value,
-                style =
-                    MaterialTheme.typography
-                        .titleLarge,
-                fontWeight =
-                    FontWeight.Bold
-            )
-        }
+fun SetupScreen(onSet:(String)->Unit){
+    var p by remember{mutableStateOf("")};var c by remember{mutableStateOf("")};var e by remember{mutableStateOf("")}
+    Column(Modifier.fillMaxSize().padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
+        Icon(Icons.Default.Lock,null,Modifier.size(64.dp));Text("Secure My Finance Tracker",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+        Spacer(Modifier.height(16.dp));Text("Create an app password. This password is stored only as a protected hash on this phone.")
+        Spacer(Modifier.height(16.dp));OutlinedTextField(p,{p=it},label={Text("Password")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+        Spacer(Modifier.height(8.dp));OutlinedTextField(c,{c=it},label={Text("Confirm password")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+        if(e.isNotEmpty())Text(e,color=MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(12.dp));Button(onClick={e=when{p.length<6->"Use at least 6 characters.";p!=c->"Passwords do not match.";else->""};if(e.isEmpty())onSet(p)},Modifier.fillMaxWidth()){Text("Create Password")}
     }
 }
-
-// -------------------- Add / Edit EMI --------------------
 
 @Composable
-fun AddEditScreen(
-    vm: EmiViewModel,
-    existing: EmiPlan?,
-    onDone: () -> Unit
-) {
-
-    var name by remember {
-        mutableStateOf(
-            existing?.phoneName ?: ""
-        )
-    }
-
-    var price by remember {
-        mutableStateOf(
-            existing?.price?.toString() ?: ""
-        )
-    }
-
-    var down by remember {
-        mutableStateOf(
-            existing?.downPayment?.toString()
-                ?: ""
-        )
-    }
-
-    var installments by remember {
-        mutableStateOf(
-            existing?.installments?.toString()
-                ?: ""
-        )
-    }
-
-    var dueDay by remember {
-        mutableStateOf(
-            existing?.dueDay?.toString()
-                ?: "10"
-        )
-    }
-
-    var error by remember {
-        mutableStateOf("")
-    }
-
-    LazyColumn(
-        Modifier.fillMaxSize(),
-        contentPadding =
-            PaddingValues(20.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(12.dp)
-    ) {
-
-        item {
-
-            Text(
-                if (existing == null) {
-                    "Add Your Phone EMI"
-                } else {
-                    "Edit EMI Plan"
-                },
-                style =
-                    MaterialTheme.typography
-                        .headlineSmall,
-                fontWeight =
-                    FontWeight.Bold
-            )
-        }
-
-        item {
-
-            OutlinedTextField(
-                value = name,
-                onValueChange = {
-                    name = it
-                },
-                label = {
-                    Text(
-                        "Phone Model"
-                    )
-                },
-                placeholder = {
-                    Text(
-                        "e.g. Samsung Galaxy S25"
-                    )
-                },
-                modifier =
-                    Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-
-        item {
-
-            OutlinedTextField(
-                value = price,
-                onValueChange = {
-                    price = it
-                },
-                label = {
-                    Text(
-                        "Phone Price (৳)"
-                    )
-                },
-                modifier =
-                    Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-
-        item {
-
-            OutlinedTextField(
-                value = down,
-                onValueChange = {
-                    down = it
-                },
-                label = {
-                    Text(
-                        "Down Payment (৳)"
-                    )
-                },
-                modifier =
-                    Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-
-        item {
-
-            OutlinedTextField(
-                value = installments,
-                onValueChange = {
-                    installments = it
-                },
-                label = {
-                    Text(
-                        "Number of Installments"
-                    )
-                },
-                modifier =
-                    Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-        }
-
-        item {
-
-            OutlinedTextField(
-                value = dueDay,
-                onValueChange = {
-                    dueDay = it
-                },
-                label = {
-                    Text(
-                        "Monthly Due Day (1-28)"
-                    )
-                },
-                modifier =
-                    Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Text(
-                "You'll receive a reminder 1 day before and another on the due date.",
-                style =
-                    MaterialTheme.typography
-                        .bodySmall,
-                modifier =
-                    Modifier.padding(
-                        top = 5.dp
-                    )
-            )
-        }
-
-        item {
-
-            val p =
-                price.toDoubleOrNull()
-                    ?: 0.0
-
-            val d =
-                down.toDoubleOrNull()
-                    ?: 0.0
-
-            val n =
-                installments.toIntOrNull()
-                    ?: 0
-
-            val monthly =
-                if (n > 0) {
-                    max(
-                        0.0,
-                        p - d
-                    ) / n
-                } else {
-                    0.0
-                }
-
-            Card(
-                Modifier.fillMaxWidth()
-            ) {
-
-                Column(
-                    Modifier.padding(16.dp)
-                ) {
-
-                    Text(
-                        "Calculated Monthly EMI",
-                        style =
-                            MaterialTheme.typography
-                                .labelLarge
-                    )
-
-                    Text(
-                        money(monthly),
-                        style =
-                            MaterialTheme.typography
-                                .headlineSmall,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-                }
-            }
-        }
-
-        item {
-
-            if (error.isNotEmpty()) {
-
-                Text(
-                    error,
-                    color =
-                        MaterialTheme.colorScheme
-                            .error
-                )
-            }
-
-            Button(
-
-                onClick = {
-
-                    val p =
-                        price.toDoubleOrNull()
-
-                    val d =
-                        down.toDoubleOrNull()
-
-                    val n =
-                        installments.toIntOrNull()
-
-                    val day =
-                        dueDay.toIntOrNull()
-
-                    error =
-                        when {
-
-                            name.isBlank() ->
-                                "Please enter the phone model."
-
-                            p == null || p <= 0 ->
-                                "Please enter a valid phone price."
-
-                            d == null ||
-                                    d < 0 ||
-                                    d >= p ->
-                                "Please enter a valid down payment."
-
-                            n == null ||
-                                    n <= 0 ->
-                                "Please enter the number of installments."
-
-                            day == null ||
-                                    day !in 1..28 ->
-                                "Due day must be between 1 and 28."
-
-                            else ->
-                                ""
-                        }
-
-                    if (error.isEmpty()) {
-
-                        if (existing == null) {
-
-                            vm.addPlan(
-                                name,
-                                p!!,
-                                d!!,
-                                n!!,
-                                day!!
-                            )
-
-                        } else {
-
-                            vm.updatePlan(
-                                existing,
-                                name,
-                                p!!,
-                                d!!,
-                                n!!,
-                                day!!
-                            )
-                        }
-
-                        onDone()
-                    }
-                },
-
-                modifier =
-                    Modifier.fillMaxWidth()
-
-            ) {
-
-                Icon(
-                    if (existing == null) {
-                        Icons.Default.Save
-                    } else {
-                        Icons.Default.CheckCircle
-                    },
-                    null
-                )
-
-                Spacer(
-                    Modifier.width(8.dp)
-                )
-
-                Text(
-                    if (existing == null) {
-                        "Save EMI Plan"
-                    } else {
-                        "Update EMI Plan"
-                    }
-                )
-            }
-        }
-    }
-}
-
-// -------------------- Main Activity --------------------
-
-class MainActivity :
-    ComponentActivity() {
-
-    override fun onCreate(
-        savedInstanceState: Bundle?
-    ) {
-
-        super.onCreate(
-            savedInstanceState
-        )
-
-        enableEdgeToEdge()
-
-        createNotificationChannel(
-            this
-        )
-
-        if (
-            Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(
-                Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(
-                    Manifest.permission.POST_NOTIFICATIONS
-                ),
-                1001
-            )
-        }
-
-        val repository =
-            EmiRepository(this)
-
-        EmiNotificationScheduler
-            .rescheduleAll(
-                this,
-                repository.loadPlans()
-            )
-
-        setContent {
-
-            MyEmiApp()
-        }
+fun LockScreen(onUnlock:(String)->Unit){
+    var p by remember{mutableStateOf("")};var e by remember{mutableStateOf("")}
+    Column(Modifier.fillMaxSize().padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
+        Icon(Icons.Default.Lock,null,Modifier.size(64.dp));Text("My Finance Tracker",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+        Text("Enter your app password to continue.")
+        Spacer(Modifier.height(16.dp));OutlinedTextField(p,{p=it},label={Text("Password")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+        if(e.isNotEmpty())Text(e,color=MaterialTheme.colorScheme.error)
+        Spacer(Modifier.height(12.dp));Button(onClick={if(p.isBlank())e="Enter your password." else {onUnlock(p);e="Incorrect password."}},Modifier.fillMaxWidth()){Text("Unlock")}
     }
 }
