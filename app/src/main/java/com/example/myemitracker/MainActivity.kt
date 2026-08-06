@@ -3702,9 +3702,9 @@ fun ChangePasswordForm(
 
     FormColumn("Change Password") {
         Text("Your new password replaces the old one securely.")
-        Field("Current password", current, { current = it }, isPassword = true)
-        Field("New password", newPassword, { newPassword = it }, isPassword = true)
-        Field("Confirm new password", confirm, { confirm = it }, isPassword = true)
+        Field("Current password", current, isPassword = true) { current = it }
+        Field("New password", newPassword, isPassword = true) { newPassword = it }
+        Field("Confirm new password", confirm, isPassword = true) { confirm = it }
         if (error.isNotEmpty()) {
             Text(error, color = MaterialTheme.colorScheme.error)
         }
@@ -3805,8 +3805,8 @@ fun FormColumn(
 fun Field(
     label: String,
     value: String,
-    onChange: (String) -> Unit,
-    isPassword: Boolean = false
+    isPassword: Boolean = false,
+    onChange: (String) -> Unit
 ) {
 
     OutlinedTextField(
