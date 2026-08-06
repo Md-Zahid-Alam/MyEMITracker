@@ -2,6 +2,7 @@ package com.example.myemitracker
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.DatePickerDialog
 import android.content.BroadcastReceiver
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -35,6 +36,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
@@ -78,6 +80,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -114,7 +117,9 @@ data class Payment(
     val dueDate: Long,
     val amount: Double,
     val paidDate: Long? = null,
-    val status: String = if (paidDate == null) "PENDING" else "PAID"
+    val status: String = if (paidDate == null) "PENDING" else "PAID",
+    val notes: String = "",
+    val receiptUri: String? = null
 )
 
 data class EmiItem(
@@ -531,7 +536,7 @@ class FinanceRepository(private val context: Context) {
 
         return JSONObject().apply {
 
-            put("version", 4)
+            put("version", 5)
 
             put(
                 "emis",
@@ -585,6 +590,8 @@ class FinanceRepository(private val context: Context) {
             )
 
             put("status", payment.status)
+            put("notes", payment.notes)
+            put("receiptUri", payment.receiptUri ?: JSONObject.NULL)
         }
     }
 
@@ -740,6 +747,13 @@ class FinanceRepository(private val context: Context) {
                                     null
                                 } else {
                                     item.optLong("paidDate")
+                                },
+                            notes = item.optString("notes", ""),
+                            receiptUri =
+                                if (item.isNull("receiptUri")) {
+                                    null
+                                } else {
+                                    item.optString("receiptUri")
                                 }
                         )
                     )
@@ -1373,6 +1387,39 @@ class FinanceViewModel(
         )
     }
 
+    fun updateEmiPayment(id: String, payment: Payment) {
+        val item = data.emis.firstOrNull { it.id == id } ?: return
+        updateEmi(
+            item.copy(
+                payments = item.payments.map {
+                    if (it.number == payment.number) payment else it
+                }
+            )
+        )
+    }
+
+    fun updateLoanPayment(id: String, payment: Payment) {
+        val item = data.loans.firstOrNull { it.id == id } ?: return
+        updateLoan(
+            item.copy(
+                payments = item.payments.map {
+                    if (it.number == payment.number) payment else it
+                }
+            )
+        )
+    }
+
+    fun updateDebtPayment(id: String, payment: Payment) {
+        val item = data.debts.firstOrNull { it.id == id } ?: return
+        updateDebt(
+            item.copy(
+                payments = item.payments.map {
+                    if (it.number == payment.number) payment else it
+                }
+            )
+        )
+    }
+
     fun markEmiPaid(
         id: String,
         number: Int
@@ -1392,7 +1439,8 @@ class FinanceViewModel(
                     ) {
                         it.copy(
                             paidDate =
-                                System.currentTimeMillis()
+                                System.currentTimeMillis(),
+                            status = "PAID"
                         )
                     } else {
                         it
@@ -1422,7 +1470,8 @@ class FinanceViewModel(
                     ) {
                         it.copy(
                             paidDate =
-                                System.currentTimeMillis()
+                                System.currentTimeMillis(),
+                            status = "PAID"
                         )
                     } else {
                         it
@@ -1535,10 +1584,12 @@ fun FinanceApp(
         mutableStateOf("")
     }
 
+    var paymentSection by remember {
+        mutableStateOf("EMI")
+    }
+
     BackHandler(enabled = selectedType.isNotBlank() || tab != 0) {
-        if (selectedType == "password") {
-            selectedType = "settings"
-        } else if (selectedType.isNotBlank()) {
+        if (selectedType.isNotBlank()) {
             selectedType = ""
             selectedId = ""
         } else {
@@ -1600,21 +1651,6 @@ fun FinanceApp(
                         "My Finance Tracker",
                         fontWeight = FontWeight.Bold
                     )
-                },
-
-                actions = {
-                    TextButton(
-                        onClick = {
-                            selectedType = "settings"
-                        }
-                    ) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = null
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text("Settings")
-                    }
                 }
             )
         },
@@ -1626,11 +1662,10 @@ fun FinanceApp(
                 val labels =
                     listOf(
                         "Home",
-                        "EMI",
-                        "Loans",
-                        "Debts",
+                        "Payments",
                         "Expenses",
-                        "Reports"
+                        "Reports",
+                        "Settings"
                     )
 
                 labels.forEachIndexed { index, label ->
@@ -1650,11 +1685,10 @@ fun FinanceApp(
                             val icon =
                                 when (index) {
                                     0 -> Icons.Default.Home
-                                    1 -> Icons.Default.Devices
-                                    2 -> Icons.Default.AccountBalance
-                                    3 -> Icons.Default.CreditCard
-                                    4 -> Icons.Default.Description
-                                    else -> Icons.Default.Description
+                                    1 -> Icons.Default.AccountBalance
+                                    2 -> Icons.Default.CreditCard
+                                    3 -> Icons.Default.Description
+                                    else -> Icons.Default.Settings
                                 }
 
                             Icon(
@@ -1673,18 +1707,18 @@ fun FinanceApp(
 
         floatingActionButton = {
 
-            if (tab in 1..4) {
+            if (tab == 1 || tab == 2) {
 
                 FloatingActionButton(
 
                     onClick = {
 
                         selectedType =
-                            when (tab) {
-                                1 -> "emi"
-                                2 -> "loan"
-                                3 -> "debt"
-                                else -> "expense"
+                            when {
+                                tab == 2 -> "expense"
+                                paymentSection == "EMI" -> "emi"
+                                paymentSection == "Loans" -> "loan"
+                                else -> "debt"
                             }
 
                         selectedId = ""
@@ -1770,53 +1804,24 @@ fun FinanceApp(
                         onChange = onPasswordChange,
                         verifyCurrent = verifyPassword,
                         done = {
-                            selectedType = "settings"
+                            selectedType = ""
                         }
-                    )
-                }
-
-                selectedType == "settings" -> {
-                    SettingsScreen(
-                        onChangePassword = { selectedType = "password" },
-                        onBackup = {
-                            backupLauncher.launch("my-finance-tracker-backup.json")
-                        },
-                        onRestore = {
-                            restoreLauncher.launch(
-                                arrayOf("application/json", "text/plain", "*/*")
-                            )
-                        },
-                        onLock = onLogout
                     )
                 }
 
                 tab == 0 -> Dashboard(viewModel)
 
-                tab == 1 -> EmiList(
-                    viewModel,
-                    onOpen = {
-                        selectedId = it
-                        selectedType = "emi"
+                tab == 1 -> PaymentsHub(
+                    viewModel = viewModel,
+                    section = paymentSection,
+                    onSectionChange = { paymentSection = it },
+                    onOpen = { type, id ->
+                        selectedType = type
+                        selectedId = id
                     }
                 )
 
-                tab == 2 -> LoanList(
-                    viewModel,
-                    onOpen = {
-                        selectedId = it
-                        selectedType = "loan"
-                    }
-                )
-
-                tab == 3 -> DebtList(
-                    viewModel,
-                    onOpen = {
-                        selectedId = it
-                        selectedType = "debt"
-                    }
-                )
-
-                tab == 4 -> ExpenseList(
+                tab == 2 -> ExpenseList(
                     viewModel,
                     onOpen = {
                         selectedId = it
@@ -1824,7 +1829,66 @@ fun FinanceApp(
                     }
                 )
 
-                else -> Reports(viewModel)
+                tab == 3 -> Reports(viewModel)
+
+                else -> SettingsScreen(
+                    onChangePassword = { selectedType = "password" },
+                    onBackup = {
+                        backupLauncher.launch("my-finance-tracker-backup.json")
+                    },
+                    onRestore = {
+                        restoreLauncher.launch(
+                            arrayOf("application/json", "text/plain", "*/*")
+                        )
+                    },
+                    onLock = onLogout
+                )
+            }
+        }
+    }
+}
+
+
+// ============================================================
+// PAYMENTS HUB
+// ============================================================
+
+@Composable
+fun PaymentsHub(
+    viewModel: FinanceViewModel,
+    section: String,
+    onSectionChange: (String) -> Unit,
+    onOpen: (String, String) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Text(
+            "Payments",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 16.dp, top = 12.dp)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            listOf("EMI", "Loans", "Debts").forEach { option ->
+                OutlinedButton(
+                    onClick = { onSectionChange(option) },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (section == option) "[$option]" else option)
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            when (section) {
+                "EMI" -> EmiList(viewModel) { onOpen("emi", it) }
+                "Loans" -> LoanList(viewModel) { onOpen("loan", it) }
+                else -> DebtList(viewModel) { onOpen("debt", it) }
             }
         }
     }
@@ -1951,14 +2015,14 @@ fun Dashboard(
             ) {
 
                 SummaryCard(
-                    "Monthly",
-                    money(monthly),
+                    "Spent Today",
+                    money(todayExpenses),
                     Modifier.weight(1f)
                 )
 
                 SummaryCard(
-                    "EMI Left",
-                    money(emiRemaining),
+                    "Spent This Month",
+                    money(monthExpenses),
                     Modifier.weight(1f)
                 )
             }
@@ -1970,13 +2034,13 @@ fun Dashboard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 SummaryCard(
-                    "Spent Today",
-                    money(todayExpenses),
+                    "Monthly Payments",
+                    money(monthly),
                     Modifier.weight(1f)
                 )
                 SummaryCard(
-                    "Spent This Month",
-                    money(monthExpenses),
+                    "EMI Left",
+                    money(emiRemaining),
                     Modifier.weight(1f)
                 )
             }
@@ -2053,6 +2117,37 @@ fun Dashboard(
                         Text(
                             "Due ${dateText(nextPayment.second)}"
                         )
+                    }
+                }
+            }
+        }
+
+        item {
+            Text(
+                "Recent Expenses",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        val recentExpenses = viewModel.data.expenses
+            .sortedByDescending { it.date }
+            .take(5)
+
+        if (recentExpenses.isEmpty()) {
+            item { Text("No expenses recorded yet.") }
+        } else {
+            items(recentExpenses, key = { it.id }) { expense ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(expense.title, fontWeight = FontWeight.Bold)
+                            Text("${expense.category} - ${expenseDayKey(expense.date)}")
+                        }
+                        Text(money(expense.amount), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -2581,6 +2676,12 @@ fun ExpenseList(
     var pendingDelete by remember { mutableStateOf<Expense?>(null) }
 
     val sorted = viewModel.data.expenses.sortedByDescending { it.date }
+    val currentMonthExpenses = sorted.filter { isCurrentExpenseMonth(it.date) }
+    val categoryTotals = currentMonthExpenses
+        .groupBy { it.category }
+        .mapValues { entry -> entry.value.sumOf { it.amount } }
+        .toList()
+        .sortedByDescending { it.second }
     val grouped = sorted.groupBy {
         if (viewMode == "DAILY") expenseDayKey(it.date) else expenseMonthKey(it.date)
     }
@@ -2611,6 +2712,38 @@ fun ExpenseList(
                     onClick = { viewMode = "MONTHLY" },
                     modifier = Modifier.weight(1f)
                 ) { Text(if (viewMode == "MONTHLY") "[Monthly]" else "Monthly") }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "This Month by Category",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (categoryTotals.isEmpty()) {
+                        Text("No expenses recorded this month.")
+                    } else {
+                        categoryTotals.forEach { (category, total) ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(category)
+                                Text(money(total), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Text(
+                            "Total: ${money(currentMonthExpenses.sumOf { it.amount })}",
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
         }
 
@@ -2689,8 +2822,28 @@ fun ExpenseList(
 @Composable
 fun PaymentHistory(
     payments: List<Payment>,
-    onPaid: ((Int) -> Unit)? = null
+    onUpdate: ((Payment) -> Unit)? = null
 ) {
+
+    val context = LocalContext.current
+    var editingPayment by remember { mutableStateOf<Payment?>(null) }
+    var receiptPayment by remember { mutableStateOf<Payment?>(null) }
+
+    val receiptLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        val payment = receiptPayment
+        if (uri != null && payment != null && onUpdate != null) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            onUpdate(payment.copy(receiptUri = uri.toString()))
+        }
+        receiptPayment = null
+    }
 
     Column(
         verticalArrangement =
@@ -2734,16 +2887,29 @@ fun PaymentHistory(
                                 "Paid ${dateTimeText(payment.paidDate)}"
                             )
                         }
+
+                        if (payment.notes.isNotBlank()) {
+                            Text("Note: ${payment.notes}")
+                        }
+
+                        if (payment.receiptUri != null) {
+                            Text("Receipt attached")
+                        }
                     }
 
                     if (
                         payment.paidDate == null &&
-                        onPaid != null
+                        onUpdate != null
                     ) {
 
                         Button(
                             onClick = {
-                                onPaid(payment.number)
+                                onUpdate(
+                                    payment.copy(
+                                        paidDate = System.currentTimeMillis(),
+                                        status = "PAID"
+                                    )
+                                )
                             }
                         ) {
                             Text("Mark Paid")
@@ -2763,9 +2929,121 @@ fun PaymentHistory(
                         )
                     }
                 }
+
+                if (onUpdate != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        if (payment.paidDate != null) {
+                            TextButton(
+                                onClick = {
+                                    onUpdate(
+                                        payment.copy(
+                                            paidDate = null,
+                                            status = "PENDING"
+                                        )
+                                    )
+                                }
+                            ) { Text("Undo Paid") }
+                        }
+
+                        TextButton(onClick = { editingPayment = payment }) {
+                            Text("Edit")
+                        }
+
+                        TextButton(
+                            onClick = {
+                                if (payment.receiptUri == null) {
+                                    receiptPayment = payment
+                                    receiptLauncher.launch(arrayOf("image/*"))
+                                } else {
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(
+                                                Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(payment.receiptUri)
+                                            ).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        )
+                                    }
+                                }
+                            }
+                        ) {
+                            Text(if (payment.receiptUri == null) "Attach" else "Receipt")
+                        }
+                    }
+                }
             }
         }
     }
+
+    editingPayment?.let { payment ->
+        PaymentEditDialog(
+            payment = payment,
+            onSave = {
+                onUpdate?.invoke(it)
+                editingPayment = null
+            },
+            onDismiss = { editingPayment = null }
+        )
+    }
+}
+
+@Composable
+fun PaymentEditDialog(
+    payment: Payment,
+    onSave: (Payment) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var dueDate by remember(payment) { mutableStateOf(expenseDateText(payment.dueDate)) }
+    var paidDate by remember(payment) {
+        mutableStateOf(payment.paidDate?.let { expenseDateText(it) } ?: "")
+    }
+    var notes by remember(payment) { mutableStateOf(payment.notes) }
+    var error by remember(payment) { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Payment ${payment.number}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DatePickerField("Due date", dueDate) { dueDate = it }
+                if (payment.paidDate != null) {
+                    DatePickerField("Paid date", paidDate) { paidDate = it }
+                }
+                Field("Payment notes", notes) { notes = it }
+                if (error.isNotEmpty()) {
+                    Text(error, color = MaterialTheme.colorScheme.error)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val parsedDueDate = parseExpenseDate(dueDate)
+                    val parsedPaidDate = if (payment.paidDate == null) null else parseExpenseDate(paidDate)
+
+                    if (parsedDueDate == null || (payment.paidDate != null && parsedPaidDate == null)) {
+                        error = "Enter valid dates as DD-MM-YYYY."
+                    } else {
+                        onSave(
+                            payment.copy(
+                                dueDate = parsedDueDate,
+                                paidDate = parsedPaidDate,
+                                notes = notes.trim(),
+                                status = if (parsedPaidDate == null) "PENDING" else "PAID"
+                            )
+                        )
+                    }
+                }
+            ) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }
 
 
@@ -3223,7 +3501,7 @@ fun EmiForm(
             PaymentHistory(
                 existing.payments
             ) {
-                viewModel.markEmiPaid(
+                viewModel.updateEmiPayment(
                     existing.id,
                     it
                 )
@@ -3712,7 +3990,7 @@ fun LoanForm(
             PaymentHistory(
                 existing.payments
             ) {
-                viewModel.markLoanPaid(
+                viewModel.updateLoanPayment(
                     existing.id,
                     it
                 )
@@ -3941,7 +4219,9 @@ fun DebtForm(
 
             PaymentHistory(
                 existing.payments
-            )
+            ) {
+                viewModel.updateDebtPayment(existing.id, it)
+            }
 
         } else {
 
@@ -4031,7 +4311,7 @@ fun ExpenseForm(
     var error by remember { mutableStateOf("") }
 
     FormColumn(if (existing == null) "Add Expense" else "Edit Expense") {
-        Field("Expense name", title) { title = it }
+        Field("Expense name *", title) { title = it }
 
         ChoiceDropdown(
             label = "Category",
@@ -4050,8 +4330,8 @@ fun ExpenseForm(
             onSelect = { category = it }
         )
 
-        Field("Amount", amount) { amount = it }
-        Field("Date (DD-MM-YYYY)", date) { date = it }
+        Field("Amount *", amount) { amount = it }
+        DatePickerField("Date *", date) { date = it }
         Field("Notes (optional)", notes) { notes = it }
 
         Text(
@@ -4275,6 +4555,38 @@ fun FormColumn(
 }
 
 @Composable
+fun DatePickerField(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+
+    OutlinedButton(
+        onClick = {
+            val initial = parseExpenseDate(value) ?: System.currentTimeMillis()
+            val calendar = Calendar.getInstance().apply { timeInMillis = initial }
+            DatePickerDialog(
+                context,
+                { _, year, month, day ->
+                    val selected = Calendar.getInstance().apply {
+                        clear()
+                        set(year, month, day)
+                    }.timeInMillis
+                    onChange(expenseDateText(selected))
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text("$label: $value")
+    }
+}
+
+@Composable
 fun Field(
     label: String,
     value: String,
@@ -4283,6 +4595,19 @@ fun Field(
 ) {
 
     var passwordVisible by remember { mutableStateOf(false) }
+    val normalizedLabel = label.lowercase(Locale.US)
+    val numberField = !isPassword &&
+            !normalizedLabel.contains("date") &&
+            !normalizedLabel.contains("note") &&
+            listOf(
+                "amount",
+                "price",
+                "interest",
+                "installment",
+                "due day",
+                "previous payment",
+                "principal"
+            ).any { normalizedLabel.contains(it) }
 
     OutlinedTextField(
 
@@ -4296,6 +4621,10 @@ fun Field(
 
         modifier =
             Modifier.fillMaxWidth(),
+
+        keyboardOptions = KeyboardOptions(
+            keyboardType = if (numberField) KeyboardType.Decimal else KeyboardType.Text
+        ),
 
         visualTransformation =
             if (isPassword && !passwordVisible) {
@@ -4687,6 +5016,18 @@ fun buildExpenseReport(expenses: List<Expense>): String {
         appendLine("EXPENSE REPORT")
         appendLine("Entries: ${expenses.size}")
         appendLine("Total: ${money(expenses.sumOf { it.amount })}")
+        appendLine()
+
+        appendLine("CURRENT MONTH BY CATEGORY")
+        expenses
+            .filter { isCurrentExpenseMonth(it.date) }
+            .groupBy { it.category }
+            .mapValues { entry -> entry.value.sumOf { it.amount } }
+            .toList()
+            .sortedByDescending { it.second }
+            .forEach { (category, total) ->
+                appendLine("$category: ${money(total)}")
+            }
         appendLine()
 
         expenses.sortedByDescending { it.date }.forEach {
