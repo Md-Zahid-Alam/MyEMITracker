@@ -16,6 +16,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,6 +47,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -72,6 +74,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -205,6 +209,14 @@ fun dueDate(start: Long, dueDay: Int): Long {
 
     return calendar.timeInMillis
 }
+
+fun currentMonthDueDate(dueDay: Int): Long = Calendar.getInstance().apply {
+    set(Calendar.HOUR_OF_DAY, 9)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+    set(Calendar.DAY_OF_MONTH, dueDay.coerceIn(1, 28))
+}.timeInMillis
 
 fun parseReminders(text: String): List<Int> {
     return text
@@ -1415,6 +1427,15 @@ fun FinanceApp(
         mutableStateOf("")
     }
 
+    BackHandler(enabled = selectedType.isNotBlank() || tab != 0) {
+        if (selectedType.isNotBlank()) {
+            selectedType = ""
+            selectedId = ""
+        } else {
+            tab = 0
+        }
+    }
+
     val backupLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.CreateDocument(
@@ -2061,6 +2082,10 @@ fun EmiList(
                     ) {
                         Text("Open")
                     }
+
+                    TextButton(onClick = { viewModel.deleteEmi(item.id) }) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }
@@ -2176,6 +2201,10 @@ fun LoanList(
                             Modifier.fillMaxWidth()
                     ) {
                         Text("Open")
+                    }
+
+                    TextButton(onClick = { viewModel.deleteLoan(item.id) }) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -2315,6 +2344,10 @@ fun DebtList(
                             Modifier.fillMaxWidth()
                     ) {
                         Text("Open")
+                    }
+
+                    TextButton(onClick = { viewModel.deleteDebt(item.id) }) {
+                        Text("Delete", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -2490,6 +2523,8 @@ fun EmiForm(
                 ?: "0"
         )
     }
+
+    val originalPreviousPaid = existing?.payments?.count { it.paidDate != null } ?: 0
 
     var reminders by remember {
         mutableStateOf(
@@ -2717,19 +2752,15 @@ fun EmiForm(
 
                 if (error.isEmpty()) {
 
+                    val previousChanged = existing != null && previous != originalPreviousPaid
                     val firstDue =
                         existing
                             ?.payments
                             ?.minOfOrNull {
                                 it.dueDate
                             }
-                            ?: addMonths(
-                                dueDate(
-                                    System.currentTimeMillis(),
-                                    day
-                                ),
-                                -previous
-                            )
+                            ?.takeIf { !previousChanged }
+                            ?: addMonths(currentMonthDueDate(day), -previous)
 
                     val oldPaid =
                         existing
@@ -2740,6 +2771,7 @@ fun EmiForm(
                             ?.associateBy {
                                 it.number
                             }
+                            ?.takeIf { !previousChanged }
                             ?: emptyMap()
 
                     val payments =
@@ -2762,7 +2794,7 @@ fun EmiForm(
                                     oldPaid[number]
                                         ?.paidDate
                                         ?: if (
-                                            existing == null &&
+                                            (existing == null || previousChanged) &&
                                             number <= previous
                                         ) {
                                             System.currentTimeMillis()
@@ -2961,6 +2993,8 @@ fun LoanForm(
                 ?: "0"
         )
     }
+
+    val originalPreviousRepayments = existing?.payments?.count { it.paidDate != null } ?: 0
 
     var reminders by remember {
         mutableStateOf(
@@ -3210,19 +3244,15 @@ fun LoanForm(
 
                 if (error.isEmpty()) {
 
+                    val previousChanged = existing != null && previousCount != originalPreviousRepayments
                     val firstDue =
                         existing
                             ?.payments
                             ?.minOfOrNull {
                                 it.dueDate
                             }
-                            ?: addMonths(
-                                dueDate(
-                                    System.currentTimeMillis(),
-                                    day
-                                ),
-                                -previousCount
-                            )
+                            ?.takeIf { !previousChanged }
+                            ?: addMonths(currentMonthDueDate(day), -previousCount)
 
                     val oldPaid =
                         existing
@@ -3233,6 +3263,7 @@ fun LoanForm(
                             ?.associateBy {
                                 it.number
                             }
+                            ?.takeIf { !previousChanged }
                             ?: emptyMap()
 
                     val payments =
@@ -3256,7 +3287,7 @@ fun LoanForm(
                                     oldPaid[number]
                                         ?.paidDate
                                         ?: if (
-                                            existing == null &&
+                                            (existing == null || previousChanged) &&
                                             number <= previousCount
                                         ) {
                                             System.currentTimeMillis()
@@ -3406,6 +3437,8 @@ fun DebtForm(
         mutableStateOf("")
     }
 
+    var previousPayment by remember { mutableStateOf("") }
+
     var error by remember {
         mutableStateOf("")
     }
@@ -3445,6 +3478,12 @@ fun DebtForm(
             notes
         ) {
             notes = it
+        }
+
+        if (existing == null) {
+            Field("Previous payment amount (optional)", previousPayment) {
+                previousPayment = it
+            }
         }
 
         if (existing != null) {
@@ -3596,10 +3635,13 @@ fun DebtForm(
                     val originalAmount =
                         amount.toDoubleOrNull()
                             ?: 0.0
+                    val previousAmount = previousPayment.toDoubleOrNull() ?: 0.0
 
                     if (
                         name.isBlank() ||
-                        originalAmount <= 0
+                        originalAmount <= 0 ||
+                        previousAmount < 0 ||
+                        previousAmount > originalAmount
                     ) {
 
                         error =
@@ -3619,8 +3661,9 @@ fun DebtForm(
                                     null,
                                 notes =
                                     notes.trim(),
-                                payments =
-                                    emptyList()
+                                payments = if (previousAmount > 0) {
+                                    listOf(Payment(1, System.currentTimeMillis(), previousAmount, System.currentTimeMillis()))
+                                } else emptyList()
                             )
                         )
 
@@ -3659,9 +3702,9 @@ fun ChangePasswordForm(
 
     FormColumn("Change Password") {
         Text("Your new password replaces the old one securely.")
-        Field("Current password", current) { current = it }
-        Field("New password", newPassword) { newPassword = it }
-        Field("Confirm new password", confirm) { confirm = it }
+        Field("Current password", current, { current = it }, isPassword = true)
+        Field("New password", newPassword, { newPassword = it }, isPassword = true)
+        Field("Confirm new password", confirm, { confirm = it }, isPassword = true)
         if (error.isNotEmpty()) {
             Text(error, color = MaterialTheme.colorScheme.error)
         }
@@ -3670,7 +3713,7 @@ fun ChangePasswordForm(
                 error = when {
                     current.isBlank() -> "Enter your current password."
                     !verifyCurrent(current) -> "Current password is incorrect."
-                    newPassword.length < 6 -> "Use at least 6 characters."
+                    newPassword.length < 4 -> "Use at least 4 characters."
                     newPassword != confirm -> "New passwords do not match."
                     else -> ""
                 }
@@ -3762,7 +3805,8 @@ fun FormColumn(
 fun Field(
     label: String,
     value: String,
-    onChange: (String) -> Unit
+    onChange: (String) -> Unit,
+    isPassword: Boolean = false
 ) {
 
     OutlinedTextField(
@@ -3777,6 +3821,8 @@ fun Field(
 
         modifier =
             Modifier.fillMaxWidth(),
+
+        visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
 
         singleLine = true
     )
@@ -3798,6 +3844,7 @@ fun Reports(
     var pendingReport by remember {
         mutableStateOf("")
     }
+    var pendingExcel by remember { mutableStateOf("") }
 
     val launcher =
         rememberLauncherForActivityResult(
@@ -3821,6 +3868,13 @@ fun Reports(
             pendingReport = ""
         }
 
+    val excelLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.ms-excel")
+    ) { uri ->
+        if (uri != null && pendingExcel.isNotEmpty()) writeExcelToUri(context, uri, pendingExcel)
+        pendingExcel = ""
+    }
+
     fun createReport(
         fileName: String,
         content: String
@@ -3829,6 +3883,11 @@ fun Reports(
         pendingReport = content
 
         launcher.launch(fileName)
+    }
+
+    fun createExcel(fileName: String, content: String) {
+        pendingExcel = content
+        excelLauncher.launch(fileName)
     }
 
     Column(
@@ -3890,6 +3949,11 @@ fun Reports(
                 "Generate Complete Report"
             )
         }
+
+        OutlinedButton(
+            onClick = { createExcel("Complete_Finance_Report.xls", buildCompleteReport(viewModel.data)) },
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Download Complete Excel Report") }
 
         viewModel.data.emis.forEach { item ->
 
@@ -4342,6 +4406,16 @@ fun buildDebtReport(
 // PDF GENERATION
 // ============================================================
 
+fun writeExcelToUri(context: Context, uri: android.net.Uri, text: String) {
+    fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    val xml = buildString {
+        append("<?xml version=\"1.0\"?><Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\"><Worksheet ss:Name=\"Report\"><Table>")
+        text.lines().forEach { line -> append("<Row><Cell><Data ss:Type=\"String\">${escape(line)}</Data></Cell></Row>") }
+        append("</Table></Worksheet></Workbook>")
+    }
+    context.contentResolver.openOutputStream(uri)?.use { it.write(xml.toByteArray()) }
+}
+
 fun writePdfToUri(
     context: Context,
     uri: android.net.Uri,
@@ -4586,6 +4660,7 @@ fun SetupScreen(
             modifier =
                 Modifier.fillMaxWidth(),
 
+            visualTransformation = PasswordVisualTransformation(),
             singleLine = true
         )
 
@@ -4608,6 +4683,7 @@ fun SetupScreen(
             modifier =
                 Modifier.fillMaxWidth(),
 
+            visualTransformation = PasswordVisualTransformation(),
             singleLine = true
         )
 
@@ -4634,8 +4710,8 @@ fun SetupScreen(
 
                 error = when {
 
-                    password.length < 6 ->
-                        "Use at least 6 characters."
+                    password.length < 4 ->
+                        "Use at least 4 characters."
 
                     password != confirmPassword ->
                         "Passwords do not match."
@@ -4738,6 +4814,7 @@ fun LockScreen(
             modifier =
                 Modifier.fillMaxWidth(),
 
+            visualTransformation = PasswordVisualTransformation(),
             singleLine = true
         )
 
