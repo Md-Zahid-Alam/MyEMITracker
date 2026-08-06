@@ -1966,6 +1966,8 @@ fun EmiList(
     onOpen: (String) -> Unit
 ) {
 
+    var pendingDelete by remember { mutableStateOf<EmiItem?>(null) }
+
     LazyColumn(
 
         modifier =
@@ -2083,12 +2085,24 @@ fun EmiList(
                         Text("Open")
                     }
 
-                    TextButton(onClick = { viewModel.deleteEmi(item.id) }) {
+                    TextButton(onClick = { pendingDelete = item }) {
                         Text("Delete", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         }
+    }
+
+    pendingDelete?.let { item ->
+        DeleteConfirmationDialog(
+            itemType = "EMI purchase",
+            itemName = item.name,
+            onConfirm = {
+                viewModel.deleteEmi(item.id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null }
+        )
     }
 }
 
@@ -2102,6 +2116,8 @@ fun LoanList(
     viewModel: FinanceViewModel,
     onOpen: (String) -> Unit
 ) {
+
+    var pendingDelete by remember { mutableStateOf<Loan?>(null) }
 
     LazyColumn(
 
@@ -2203,12 +2219,24 @@ fun LoanList(
                         Text("Open")
                     }
 
-                    TextButton(onClick = { viewModel.deleteLoan(item.id) }) {
+                    TextButton(onClick = { pendingDelete = item }) {
                         Text("Delete", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         }
+    }
+
+    pendingDelete?.let { item ->
+        DeleteConfirmationDialog(
+            itemType = "loan",
+            itemName = item.name,
+            onConfirm = {
+                viewModel.deleteLoan(item.id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null }
+        )
     }
 }
 
@@ -2222,6 +2250,8 @@ fun DebtList(
     viewModel: FinanceViewModel,
     onOpen: (String) -> Unit
 ) {
+
+    var pendingDelete by remember { mutableStateOf<Debt?>(null) }
 
     LazyColumn(
 
@@ -2346,13 +2376,52 @@ fun DebtList(
                         Text("Open")
                     }
 
-                    TextButton(onClick = { viewModel.deleteDebt(item.id) }) {
+                    TextButton(onClick = { pendingDelete = item }) {
                         Text("Delete", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
         }
     }
+
+    pendingDelete?.let { item ->
+        DeleteConfirmationDialog(
+            itemType = "debt",
+            itemName = item.name,
+            onConfirm = {
+                viewModel.deleteDebt(item.id)
+                pendingDelete = null
+            },
+            onDismiss = { pendingDelete = null }
+        )
+    }
+}
+
+
+@Composable
+fun DeleteConfirmationDialog(
+    itemType: String,
+    itemName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete $itemType?") },
+        text = {
+            Text("Delete \"$itemName\" and all of its payment history? This cannot be undone.")
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Delete", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 
