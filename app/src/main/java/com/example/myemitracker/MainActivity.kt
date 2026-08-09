@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
@@ -138,7 +139,8 @@ data class EmiItem(
     val startDate: Long,
     val dueDay: Int,
     val reminderDays: List<Int>,
-    val payments: List<Payment>
+    val payments: List<Payment>,
+    val archived: Boolean = false
 )
 
 data class Loan(
@@ -156,7 +158,8 @@ data class Loan(
     val dueDay: Int,
     val reminderDays: List<Int>,
     val payments: List<Payment>,
-    val repaymentMode: String = "EQUAL"
+    val repaymentMode: String = "EQUAL",
+    val archived: Boolean = false
 )
 
 data class Debt(
@@ -166,7 +169,8 @@ data class Debt(
     val originalAmount: Double,
     val dueDate: Long?,
     val notes: String,
-    val payments: List<Payment>
+    val payments: List<Payment>,
+    val archived: Boolean = false
 )
 
 data class Expense(
@@ -234,6 +238,30 @@ fun isCurrentExpenseMonth(value: Long): Boolean {
     val other = Calendar.getInstance().apply { timeInMillis = value }
     return current.get(Calendar.YEAR) == other.get(Calendar.YEAR) &&
             current.get(Calendar.MONTH) == other.get(Calendar.MONTH)
+}
+
+fun emiCompleted(item: EmiItem): Boolean {
+    return item.payments.isNotEmpty() && item.payments.all { it.paidDate != null }
+}
+
+fun loanCompleted(item: Loan): Boolean {
+    return item.payments.isNotEmpty() && item.payments.all { it.paidDate != null }
+}
+
+fun debtPaidAmount(item: Debt): Double {
+    return item.payments.filter { it.paidDate != null }.sumOf { it.amount }
+}
+
+fun debtRemainingAmount(item: Debt): Double {
+    return max(0.0, item.originalAmount - debtPaidAmount(item))
+}
+
+fun debtCompleted(item: Debt): Boolean {
+    return item.originalAmount > 0 && debtRemainingAmount(item) <= 0.005
+}
+
+fun completionDate(payments: List<Payment>): Long? {
+    return payments.mapNotNull { it.paidDate }.maxOrNull()
 }
 
 fun addMonths(time: Long, months: Int): Long {
@@ -536,7 +564,7 @@ class FinanceRepository(private val context: Context) {
 
         return JSONObject().apply {
 
-            put("version", 5)
+            put("version", 6)
 
             put(
                 "emis",
@@ -616,6 +644,7 @@ class FinanceRepository(private val context: Context) {
             put("monthlyPayment", item.monthlyPayment)
             put("startDate", item.startDate)
             put("dueDay", item.dueDay)
+            put("archived", item.archived)
 
             put(
                 "reminderDays",
@@ -655,6 +684,7 @@ class FinanceRepository(private val context: Context) {
 
             put("startDate", item.startDate)
             put("dueDay", item.dueDay)
+            put("archived", item.archived)
 
             put(
                 "reminderDays",
@@ -688,6 +718,7 @@ class FinanceRepository(private val context: Context) {
             )
 
             put("notes", item.notes)
+            put("archived", item.archived)
 
             put(
                 "payments",
@@ -846,7 +877,8 @@ class FinanceRepository(private val context: Context) {
                         reminderDays = reminderList,
                         payments = readPayments(
                             item.optJSONArray("payments")
-                        )
+                        ),
+                        archived = item.optBoolean("archived", false)
                     )
                 )
             }
@@ -933,7 +965,8 @@ class FinanceRepository(private val context: Context) {
                         reminderDays = reminderList,
                         payments = readPayments(
                             item.optJSONArray("payments")
-                        )
+                        ),
+                        archived = item.optBoolean("archived", false)
                     )
                 )
             }
@@ -980,7 +1013,8 @@ class FinanceRepository(private val context: Context) {
                         ),
                         payments = readPayments(
                             item.optJSONArray("payments")
-                        )
+                        ),
+                        archived = item.optBoolean("archived", false)
                     )
                 )
             }
@@ -1030,7 +1064,7 @@ object ReminderScheduler {
                 AlarmManager::class.java
             )
 
-        data.emis.forEach { item ->
+        data.emis.filterNot { it.archived }.forEach { item ->
 
             item.payments
                 .filter { it.paidDate == null }
@@ -1049,7 +1083,7 @@ object ReminderScheduler {
                 }
         }
 
-        data.loans.forEach { item ->
+        data.loans.filterNot { it.archived }.forEach { item ->
 
             item.payments
                 .filter { it.paidDate == null }
@@ -1295,6 +1329,17 @@ class FinanceViewModel(
         )
     }
 
+    fun setEmiArchived(id: String, archived: Boolean) {
+        val item = data.emis.firstOrNull { it.id == id } ?: return
+        updateEmi(item.copy(archived = archived))
+    }
+
+    fun reopenEmi(id: String) {
+        val item = data.emis.firstOrNull { it.id == id } ?: return
+        val lastPaid = item.payments.filter { it.paidDate != null }.maxByOrNull { it.number } ?: return
+        updateEmiPayment(id, lastPaid.copy(paidDate = null, status = "PENDING"))
+    }
+
     fun addLoan(item: Loan) {
 
         save(
@@ -1330,6 +1375,17 @@ class FinanceViewModel(
         )
     }
 
+    fun setLoanArchived(id: String, archived: Boolean) {
+        val item = data.loans.firstOrNull { it.id == id } ?: return
+        updateLoan(item.copy(archived = archived))
+    }
+
+    fun reopenLoan(id: String) {
+        val item = data.loans.firstOrNull { it.id == id } ?: return
+        val lastPaid = item.payments.filter { it.paidDate != null }.maxByOrNull { it.number } ?: return
+        updateLoanPayment(id, lastPaid.copy(paidDate = null, status = "PENDING"))
+    }
+
     fun addDebt(item: Debt) {
 
         save(
@@ -1363,6 +1419,17 @@ class FinanceViewModel(
                 }
             )
         )
+    }
+
+    fun setDebtArchived(id: String, archived: Boolean) {
+        val item = data.debts.firstOrNull { it.id == id } ?: return
+        updateDebt(item.copy(archived = archived))
+    }
+
+    fun reopenDebt(id: String) {
+        val item = data.debts.firstOrNull { it.id == id } ?: return
+        val lastPaid = item.payments.filter { it.paidDate != null }.maxByOrNull { it.number } ?: return
+        updateDebtPayment(id, lastPaid.copy(paidDate = null, status = "PENDING"))
     }
 
     fun addExpense(item: Expense) {
@@ -1495,6 +1562,11 @@ class FinanceViewModel(
             data.debts.firstOrNull {
                 it.id == id
             } ?: return
+
+        val remaining = debtRemainingAmount(item)
+        if (remaining <= 0 || amount > remaining + 0.005) {
+            return
+        }
 
         val nextNumber =
             (item.payments.maxOfOrNull {
@@ -1875,12 +1947,12 @@ fun PaymentsHub(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             listOf("EMI", "Loans", "Debts").forEach { option ->
-                OutlinedButton(
+                SelectableButton(
+                    label = option,
+                    selected = section == option,
                     onClick = { onSectionChange(option) },
                     modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (section == option) "[$option]" else option)
-                }
+                )
             }
         }
 
@@ -1890,6 +1962,49 @@ fun PaymentsHub(
                 "Loans" -> LoanList(viewModel) { onOpen("loan", it) }
                 else -> DebtList(viewModel) { onOpen("debt", it) }
             }
+        }
+    }
+}
+
+@Composable
+fun SelectableButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (selected) {
+        Button(
+            onClick = onClick,
+            modifier = modifier,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+        ) { Text(label) }
+    } else {
+        OutlinedButton(onClick = onClick, modifier = modifier) {
+            Text(label)
+        }
+    }
+}
+
+@Composable
+fun StatusFilterRow(
+    selected: String,
+    onSelect: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        listOf("Active", "Completed", "Archived").forEach { option ->
+            SelectableButton(
+                label = option,
+                selected = selected == option,
+                onClick = { onSelect(option) },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -1905,7 +2020,7 @@ fun Dashboard(
 ) {
 
     val emiRemaining =
-        viewModel.data.emis.sumOf { emi ->
+        viewModel.data.emis.filterNot { it.archived }.sumOf { emi ->
 
             emi.payments
                 .filter { it.paidDate == null }
@@ -1913,7 +2028,7 @@ fun Dashboard(
         }
 
     val loanRemaining =
-        viewModel.data.loans.sumOf { loan ->
+        viewModel.data.loans.filterNot { it.archived }.sumOf { loan ->
 
             loan.payments
                 .filter { it.paidDate == null }
@@ -1921,22 +2036,15 @@ fun Dashboard(
         }
 
     val debtRemaining =
-        viewModel.data.debts.sumOf { debt ->
-
-            max(
-                0.0,
-                debt.originalAmount -
-                        debt.payments.sumOf {
-                            it.amount
-                        }
-            )
+        viewModel.data.debts.filterNot { it.archived }.sumOf { debt ->
+            debtRemainingAmount(debt)
         }
 
     val monthly =
-        viewModel.data.emis.sumOf {
+        viewModel.data.emis.filter { !it.archived && !emiCompleted(it) }.sumOf {
             it.monthlyPayment
         } +
-                viewModel.data.loans.sumOf {
+                viewModel.data.loans.filter { !it.archived && !loanCompleted(it) }.sumOf {
                     it.monthlyPayment
                 }
 
@@ -1952,7 +2060,7 @@ fun Dashboard(
 
     val nextPayment =
         (
-                viewModel.data.emis.flatMap { item ->
+                viewModel.data.emis.filterNot { it.archived }.flatMap { item ->
                     item.payments
                         .filter { it.paidDate == null }
                         .map {
@@ -1963,7 +2071,7 @@ fun Dashboard(
                             )
                         }
                 } +
-                        viewModel.data.loans.flatMap { item ->
+                        viewModel.data.loans.filterNot { it.archived }.flatMap { item ->
                             item.payments
                                 .filter {
                                     it.paidDate == null
@@ -2204,6 +2312,14 @@ fun EmiList(
 ) {
 
     var pendingDelete by remember { mutableStateOf<EmiItem?>(null) }
+    var statusFilter by remember { mutableStateOf("Active") }
+    val visibleItems = viewModel.data.emis.filter { item ->
+        when (statusFilter) {
+            "Archived" -> item.archived
+            "Completed" -> !item.archived && emiCompleted(item)
+            else -> !item.archived && !emiCompleted(item)
+        }
+    }
 
     LazyColumn(
 
@@ -2229,17 +2345,21 @@ fun EmiList(
             )
         }
 
-        if (viewModel.data.emis.isEmpty()) {
+        item {
+            StatusFilterRow(statusFilter) { statusFilter = it }
+        }
+
+        if (visibleItems.isEmpty()) {
 
             item {
 
                 Text(
-                    "No EMI plans yet. Tap + to add one."
+                    "No $statusFilter EMI plans."
                 )
             }
         }
 
-        items(viewModel.data.emis) { item ->
+        items(visibleItems, key = { it.id }) { item ->
 
             val paid =
                 item.payments.count {
@@ -2277,6 +2397,12 @@ fun EmiList(
                         fontWeight =
                             FontWeight.Bold
                     )
+
+                    if (emiCompleted(item)) {
+                        completionDate(item.payments)?.let {
+                            Text("Completed ${dateText(it)}")
+                        }
+                    }
 
                     Text(
                         "${item.category} • " +
@@ -2322,8 +2448,24 @@ fun EmiList(
                         Text("Open")
                     }
 
-                    TextButton(onClick = { pendingDelete = item }) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Row {
+                        if (emiCompleted(item) && !item.archived) {
+                            TextButton(onClick = { viewModel.reopenEmi(item.id) }) {
+                                Text("Reopen")
+                            }
+                        }
+
+                        TextButton(
+                            onClick = {
+                                viewModel.setEmiArchived(item.id, !item.archived)
+                            }
+                        ) {
+                            Text(if (item.archived) "Restore" else "Archive")
+                        }
+
+                        TextButton(onClick = { pendingDelete = item }) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -2355,6 +2497,14 @@ fun LoanList(
 ) {
 
     var pendingDelete by remember { mutableStateOf<Loan?>(null) }
+    var statusFilter by remember { mutableStateOf("Active") }
+    val visibleItems = viewModel.data.loans.filter { item ->
+        when (statusFilter) {
+            "Archived" -> item.archived
+            "Completed" -> !item.archived && loanCompleted(item)
+            else -> !item.archived && !loanCompleted(item)
+        }
+    }
 
     LazyColumn(
 
@@ -2380,17 +2530,21 @@ fun LoanList(
             )
         }
 
-        if (viewModel.data.loans.isEmpty()) {
+        item {
+            StatusFilterRow(statusFilter) { statusFilter = it }
+        }
+
+        if (visibleItems.isEmpty()) {
 
             item {
 
                 Text(
-                    "No loans yet. Tap + to add one."
+                    "No $statusFilter loans."
                 )
             }
         }
 
-        items(viewModel.data.loans) { item ->
+        items(visibleItems, key = { it.id }) { item ->
 
             val paid =
                 item.payments.count {
@@ -2428,6 +2582,12 @@ fun LoanList(
                         "$paid/${item.installments} paid"
                     )
 
+                    if (loanCompleted(item)) {
+                        completionDate(item.payments)?.let {
+                            Text("Completed ${dateText(it)}")
+                        }
+                    }
+
                     Text(
                         "Remaining ${
                             money(
@@ -2456,8 +2616,22 @@ fun LoanList(
                         Text("Open")
                     }
 
-                    TextButton(onClick = { pendingDelete = item }) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Row {
+                        if (loanCompleted(item) && !item.archived) {
+                            TextButton(onClick = { viewModel.reopenLoan(item.id) }) {
+                                Text("Reopen")
+                            }
+                        }
+
+                        TextButton(
+                            onClick = { viewModel.setLoanArchived(item.id, !item.archived) }
+                        ) {
+                            Text(if (item.archived) "Restore" else "Archive")
+                        }
+
+                        TextButton(onClick = { pendingDelete = item }) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -2489,6 +2663,14 @@ fun DebtList(
 ) {
 
     var pendingDelete by remember { mutableStateOf<Debt?>(null) }
+    var statusFilter by remember { mutableStateOf("Active") }
+    val visibleItems = viewModel.data.debts.filter { item ->
+        when (statusFilter) {
+            "Archived" -> item.archived
+            "Completed" -> !item.archived && debtCompleted(item)
+            else -> !item.archived && !debtCompleted(item)
+        }
+    }
 
     LazyColumn(
 
@@ -2514,28 +2696,25 @@ fun DebtList(
             )
         }
 
-        if (viewModel.data.debts.isEmpty()) {
+        item {
+            StatusFilterRow(statusFilter) { statusFilter = it }
+        }
+
+        if (visibleItems.isEmpty()) {
 
             item {
 
                 Text(
-                    "No debts yet. Tap + to add one."
+                    "No $statusFilter debts."
                 )
             }
         }
 
-        items(viewModel.data.debts) { item ->
+        items(visibleItems, key = { it.id }) { item ->
 
-            val paid =
-                item.payments.sumOf {
-                    it.amount
-                }
+            val paid = debtPaidAmount(item)
 
-            val remaining =
-                max(
-                    0.0,
-                    item.originalAmount - paid
-                )
+            val remaining = debtRemainingAmount(item)
 
             val progress =
                 if (item.originalAmount > 0) {
@@ -2587,6 +2766,12 @@ fun DebtList(
                         "Remaining ${money(remaining)}"
                     )
 
+                    if (debtCompleted(item)) {
+                        completionDate(item.payments)?.let {
+                            Text("Completed ${dateText(it)}")
+                        }
+                    }
+
                     Spacer(
                         Modifier.height(8.dp)
                     )
@@ -2613,8 +2798,22 @@ fun DebtList(
                         Text("Open")
                     }
 
-                    TextButton(onClick = { pendingDelete = item }) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Row {
+                        if (debtCompleted(item) && !item.archived) {
+                            TextButton(onClick = { viewModel.reopenDebt(item.id) }) {
+                                Text("Reopen")
+                            }
+                        }
+
+                        TextButton(
+                            onClick = { viewModel.setDebtArchived(item.id, !item.archived) }
+                        ) {
+                            Text(if (item.archived) "Restore" else "Archive")
+                        }
+
+                        TextButton(onClick = { pendingDelete = item }) {
+                            Text("Delete", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }
@@ -2674,15 +2873,48 @@ fun ExpenseList(
 ) {
     var viewMode by remember { mutableStateOf("DAILY") }
     var pendingDelete by remember { mutableStateOf<Expense?>(null) }
+    var allMonths by remember { mutableStateOf(false) }
+    var selectedMonth by remember {
+        mutableStateOf(
+            Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        )
+    }
+    var search by remember { mutableStateOf("") }
+    var categoryFilter by remember { mutableStateOf("All") }
+    var expandedPeriods by remember { mutableStateOf(emptySet<String>()) }
 
     val sorted = viewModel.data.expenses.sortedByDescending { it.date }
-    val currentMonthExpenses = sorted.filter { isCurrentExpenseMonth(it.date) }
-    val categoryTotals = currentMonthExpenses
+    val availableCategories = listOf("All") + sorted.map { it.category }.distinct().sorted()
+    val selectedPeriodExpenses = if (allMonths) {
+        sorted
+    } else {
+        val selectedCalendar = Calendar.getInstance().apply { timeInMillis = selectedMonth }
+        sorted.filter { expense ->
+            val expenseCalendar = Calendar.getInstance().apply { timeInMillis = expense.date }
+            selectedCalendar.get(Calendar.YEAR) == expenseCalendar.get(Calendar.YEAR) &&
+                    selectedCalendar.get(Calendar.MONTH) == expenseCalendar.get(Calendar.MONTH)
+        }
+    }
+    val visibleExpenses = selectedPeriodExpenses.filter { expense ->
+        val matchesCategory = categoryFilter == "All" || expense.category == categoryFilter
+        val query = search.trim()
+        val matchesSearch = query.isBlank() ||
+                expense.title.contains(query, ignoreCase = true) ||
+                expense.notes.contains(query, ignoreCase = true)
+        matchesCategory && matchesSearch
+    }
+    val categoryTotals = selectedPeriodExpenses
         .groupBy { it.category }
         .mapValues { entry -> entry.value.sumOf { it.amount } }
         .toList()
         .sortedByDescending { it.second }
-    val grouped = sorted.groupBy {
+    val grouped = visibleExpenses.groupBy {
         if (viewMode == "DAILY") expenseDayKey(it.date) else expenseMonthKey(it.date)
     }
 
@@ -2704,15 +2936,75 @@ fun ExpenseList(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
+                SelectableButton(
+                    label = "Daily",
+                    selected = viewMode == "DAILY",
                     onClick = { viewMode = "DAILY" },
                     modifier = Modifier.weight(1f)
-                ) { Text(if (viewMode == "DAILY") "[Daily]" else "Daily") }
-                OutlinedButton(
+                )
+                SelectableButton(
+                    label = "Monthly",
+                    selected = viewMode == "MONTHLY",
                     onClick = { viewMode = "MONTHLY" },
                     modifier = Modifier.weight(1f)
-                ) { Text(if (viewMode == "MONTHLY") "[Monthly]" else "Monthly") }
+                )
             }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        selectedMonth = addMonths(selectedMonth, -1)
+                        allMonths = false
+                        expandedPeriods = emptySet()
+                    }
+                ) { Text("Previous") }
+
+                SelectableButton(
+                    label = expenseMonthKey(selectedMonth),
+                    selected = !allMonths,
+                    onClick = { allMonths = false },
+                    modifier = Modifier.weight(1f)
+                )
+
+                OutlinedButton(
+                    onClick = {
+                        selectedMonth = addMonths(selectedMonth, 1)
+                        allMonths = false
+                        expandedPeriods = emptySet()
+                    }
+                ) { Text("Next") }
+            }
+        }
+
+        item {
+            SelectableButton(
+                label = "All Months",
+                selected = allMonths,
+                onClick = {
+                    allMonths = true
+                    expandedPeriods = emptySet()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            Field("Search expenses", search) { search = it }
+        }
+
+        item {
+            ChoiceDropdown(
+                label = "Category filter",
+                value = categoryFilter,
+                options = availableCategories,
+                onSelect = { categoryFilter = it }
+            )
         }
 
         item {
@@ -2722,12 +3014,12 @@ fun ExpenseList(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        "This Month by Category",
+                        if (allMonths) "All Months by Category" else "${expenseMonthKey(selectedMonth)} by Category",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     if (categoryTotals.isEmpty()) {
-                        Text("No expenses recorded this month.")
+                        Text("No expenses recorded for this period.")
                     } else {
                         categoryTotals.forEach { (category, total) ->
                             Row(
@@ -2739,7 +3031,7 @@ fun ExpenseList(
                             }
                         }
                         Text(
-                            "Total: ${money(currentMonthExpenses.sumOf { it.amount })}",
+                            "Total: ${money(selectedPeriodExpenses.sumOf { it.amount })}",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -2747,51 +3039,69 @@ fun ExpenseList(
             }
         }
 
-        if (sorted.isEmpty()) {
-            item { Text("No expenses yet. Tap + to add one.") }
+        if (visibleExpenses.isEmpty()) {
+            item {
+                Text(
+                    if (selectedPeriodExpenses.isEmpty()) {
+                        "No expenses for this period. Tap + to add one."
+                    } else {
+                        "No expenses match the current search or category filter."
+                    }
+                )
+            }
         }
 
         grouped.forEach { (period, entries) ->
-            item {
-                Text(
-                    "$period - ${money(entries.sumOf { it.amount })}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+            item(key = "period-$period") {
+                OutlinedButton(
+                    onClick = {
+                        expandedPeriods = if (period in expandedPeriods) {
+                            expandedPeriods - period
+                        } else {
+                            expandedPeriods + period
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        "${if (period in expandedPeriods) "-" else "+"} $period - ${money(entries.sumOf { it.amount })}",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
-            items(entries, key = { it.id }) { expense ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(expense.title, fontWeight = FontWeight.Bold)
-                                Text(expense.category)
-                                if (viewMode == "MONTHLY") {
+            if (period in expandedPeriods) {
+                items(entries, key = { it.id }) { expense ->
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(expense.title, fontWeight = FontWeight.Bold)
+                                    Text(expense.category)
                                     Text(expenseDayKey(expense.date))
                                 }
+                                Text(
+                                    money(expense.amount),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
-                            Text(
-                                money(expense.amount),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
 
-                        if (expense.notes.isNotBlank()) {
-                            Spacer(Modifier.height(6.dp))
-                            Text(expense.notes)
-                        }
-
-                        Row {
-                            TextButton(onClick = { onOpen(expense.id) }) {
-                                Text("Edit")
+                            if (expense.notes.isNotBlank()) {
+                                Spacer(Modifier.height(6.dp))
+                                Text(expense.notes)
                             }
-                            TextButton(onClick = { pendingDelete = expense }) {
-                                Text("Delete", color = MaterialTheme.colorScheme.error)
+
+                            Row {
+                                TextButton(onClick = { onOpen(expense.id) }) {
+                                    Text("Edit")
+                                }
+                                TextButton(onClick = { pendingDelete = expense }) {
+                                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
@@ -3460,7 +3770,9 @@ fun EmiForm(
                                 parseReminders(reminders),
 
                             payments =
-                                payments
+                                payments,
+
+                            archived = existing?.archived ?: false
                         )
 
                     if (existing == null) {
@@ -3949,7 +4261,9 @@ fun LoanForm(
                                 parseReminders(reminders),
 
                             payments =
-                                payments
+                                payments,
+
+                            archived = existing?.archived ?: false
                         )
 
                     if (existing == null) {
@@ -4043,6 +4357,8 @@ fun DebtForm(
 
     var previousPayment by remember { mutableStateOf("") }
 
+    var paymentError by remember { mutableStateOf("") }
+
     var error by remember {
         mutableStateOf("")
     }
@@ -4096,16 +4412,9 @@ fun DebtForm(
                 amount.toDoubleOrNull()
                     ?: existing.originalAmount
 
-            val paid =
-                existing.payments.sumOf {
-                    it.amount
-                }
+            val paid = debtPaidAmount(existing)
 
-            val remaining =
-                max(
-                    0.0,
-                    original - paid
-                )
+            val remaining = max(0.0, original - paid)
 
             val progress =
                 if (original > 0) {
@@ -4177,6 +4486,11 @@ fun DebtForm(
                 payment
             ) {
                 payment = it
+                paymentError = ""
+            }
+
+            if (paymentError.isNotEmpty()) {
+                Text(paymentError, color = MaterialTheme.colorScheme.error)
             }
 
             Button(
@@ -4187,14 +4501,26 @@ fun DebtForm(
                         payment.toDoubleOrNull()
                             ?: 0.0
 
-                    if (paymentAmount > 0) {
+                    when {
+                        remaining <= 0 -> {
+                            paymentError = "This debt is fully paid. Reopen it before adding another payment."
+                        }
+                        paymentAmount <= 0 -> {
+                            paymentError = "Enter a valid payment amount."
+                        }
+                        paymentAmount > remaining + 0.005 -> {
+                            paymentError = "Payment cannot be more than the remaining ${money(remaining)}."
+                        }
+                        else -> {
 
-                        viewModel.markDebtPaid(
-                            existing.id,
-                            paymentAmount
-                        )
+                            viewModel.markDebtPaid(
+                                existing.id,
+                                paymentAmount
+                            )
 
-                        payment = ""
+                            payment = ""
+                            paymentError = ""
+                        }
                     }
                 },
 
@@ -4963,16 +5289,7 @@ fun buildCompleteReport(
         appendLine(
             "Remaining: ${
                 money(
-                    data.debts.sumOf {
-                        max(
-                            0.0,
-                            it.originalAmount -
-                                    it.payments.sumOf {
-                                        payment ->
-                                        payment.amount
-                                    }
-                        )
-                    }
+                    data.debts.sumOf { debtRemainingAmount(it) }
                 )
             }"
         )
@@ -5244,9 +5561,7 @@ fun buildDebtReport(
         appendLine(
             "Paid: ${
                 money(
-                    item.payments.sumOf {
-                        it.amount
-                    }
+                    debtPaidAmount(item)
                 )
             }"
         )
@@ -5254,13 +5569,7 @@ fun buildDebtReport(
         appendLine(
             "Remaining: ${
                 money(
-                    max(
-                        0.0,
-                        item.originalAmount -
-                                item.payments.sumOf {
-                                    it.amount
-                                }
-                    )
+                    debtRemainingAmount(item)
                 )
             }"
         )
