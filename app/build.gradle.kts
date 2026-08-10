@@ -12,8 +12,31 @@ android {
         applicationId = "com.example.myemitracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 7
-        versionName = "4.3"
+        versionCode = 8
+        versionName = "4.4"
+    }
+
+    val stableStorePath = System.getenv("MFT_SIGNING_STORE_FILE")
+    val stableStorePassword = System.getenv("MFT_SIGNING_PASSWORD")
+
+    signingConfigs {
+        if (!stableStorePath.isNullOrBlank() && !stableStorePassword.isNullOrBlank()) {
+            create("stable") {
+                storeFile = file(stableStorePath)
+                storePassword = stableStorePassword
+                keyAlias = "myfinancetracker"
+                keyPassword = stableStorePassword
+                storeType = "PKCS12"
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfigs.findByName("stable")?.let {
+                signingConfig = it
+            }
+        }
     }
 
     compileOptions {
