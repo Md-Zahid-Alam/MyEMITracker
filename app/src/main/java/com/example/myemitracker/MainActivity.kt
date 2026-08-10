@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -62,6 +63,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -76,14 +78,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -107,6 +114,19 @@ private const val KEY_DATA = "data"
 private const val KEY_PASSWORD_HASH = "password_hash"
 private const val KEY_PASSWORD_SALT = "password_salt"
 private const val CHANNEL_ID = "finance_reminders"
+
+private val AppColorScheme = lightColorScheme(
+    primary = Color(0xFF007C7A),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFC8F2EE),
+    onPrimaryContainer = Color(0xFF003735),
+    secondary = Color(0xFF256A66),
+    tertiary = Color(0xFF356A5F),
+    tertiaryContainer = Color(0xFFD2F2EB),
+    onTertiaryContainer = Color(0xFF123D36)
+)
+
+private val LocalFormReadOnly = staticCompositionLocalOf { false }
 
 
 // ============================================================
@@ -188,6 +208,36 @@ data class FinanceData(
     val debts: List<Debt> = emptyList(),
     val expenses: List<Expense> = emptyList()
 )
+
+data class ConfirmationRequest(
+    val title: String,
+    val message: String,
+    val confirmLabel: String = "Confirm",
+    val onConfirm: () -> Unit
+)
+
+@Composable
+fun ConfirmationDialog(
+    request: ConfirmationRequest,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(request.title) },
+        text = { Text(request.message) },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    request.onConfirm()
+                    onDismiss()
+                }
+            ) { Text(request.confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
 
 
 // ============================================================
@@ -1728,8 +1778,8 @@ fun FinanceApp(
         },
 
         bottomBar = {
-
-            NavigationBar {
+            if (selectedType.isBlank()) {
+                NavigationBar {
 
                 val labels =
                     listOf(
@@ -1775,11 +1825,12 @@ fun FinanceApp(
                     )
                 }
             }
+            }
         },
 
         floatingActionButton = {
 
-            if (tab == 1 || tab == 2) {
+            if (selectedType.isBlank() && (tab == 1 || tab == 2)) {
 
                 FloatingActionButton(
 
@@ -1977,14 +2028,19 @@ fun SelectableButton(
         Button(
             onClick = onClick,
             modifier = modifier,
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer
             )
-        ) { Text(label) }
+        ) { Text(label, maxLines = 1, fontSize = 12.sp) }
     } else {
-        OutlinedButton(onClick = onClick, modifier = modifier) {
-            Text(label)
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier,
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+        ) {
+            Text(label, maxLines = 1, fontSize = 12.sp)
         }
     }
 }
@@ -2312,6 +2368,7 @@ fun EmiList(
 ) {
 
     var pendingDelete by remember { mutableStateOf<EmiItem?>(null) }
+    var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
     val visibleItems = viewModel.data.emis.filter { item ->
         when (statusFilter) {
@@ -2440,7 +2497,16 @@ fun EmiList(
 
                     OutlinedButton(
                         onClick = {
-                            onOpen(item.id)
+                            if (!item.archived && !emiCompleted(item)) {
+                                pendingAction = ConfirmationRequest(
+                                    title = "Edit EMI?",
+                                    message = "Changes to installments, previous payments, amounts, or dates may rebuild this EMI payment schedule.",
+                                    confirmLabel = "Continue",
+                                    onConfirm = { onOpen(item.id) }
+                                )
+                            } else {
+                                onOpen(item.id)
+                            }
                         },
                         modifier =
                             Modifier.fillMaxWidth()
@@ -2450,14 +2516,35 @@ fun EmiList(
 
                     Row {
                         if (emiCompleted(item) && !item.archived) {
-                            TextButton(onClick = { viewModel.reopenEmi(item.id) }) {
+                            TextButton(onClick = {
+                                pendingAction = ConfirmationRequest(
+                                    title = "Reopen EMI?",
+                                    message = "The latest payment will return to Pending, this EMI will move to Active, and reminders may resume.",
+                                    confirmLabel = "Reopen",
+                                    onConfirm = { viewModel.reopenEmi(item.id) }
+                                )
+                            }) {
                                 Text("Reopen")
                             }
                         }
 
                         TextButton(
                             onClick = {
-                                viewModel.setEmiArchived(item.id, !item.archived)
+                                pendingAction = if (item.archived) {
+                                    ConfirmationRequest(
+                                        title = "Restore EMI?",
+                                        message = "This EMI will return to Active or Completed according to its payment status. Reminders resume if payments are pending.",
+                                        confirmLabel = "Restore",
+                                        onConfirm = { viewModel.setEmiArchived(item.id, false) }
+                                    )
+                                } else {
+                                    ConfirmationRequest(
+                                        title = "Archive EMI?",
+                                        message = "This EMI will leave normal lists and pending reminders will stop. Its history will remain available.",
+                                        confirmLabel = "Archive",
+                                        onConfirm = { viewModel.setEmiArchived(item.id, true) }
+                                    )
+                                }
                             }
                         ) {
                             Text(if (item.archived) "Restore" else "Archive")
@@ -2483,6 +2570,10 @@ fun EmiList(
             onDismiss = { pendingDelete = null }
         )
     }
+
+    pendingAction?.let { request ->
+        ConfirmationDialog(request) { pendingAction = null }
+    }
 }
 
 
@@ -2497,6 +2588,7 @@ fun LoanList(
 ) {
 
     var pendingDelete by remember { mutableStateOf<Loan?>(null) }
+    var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
     val visibleItems = viewModel.data.loans.filter { item ->
         when (statusFilter) {
@@ -2608,7 +2700,16 @@ fun LoanList(
 
                     OutlinedButton(
                         onClick = {
-                            onOpen(item.id)
+                            if (!item.archived && !loanCompleted(item)) {
+                                pendingAction = ConfirmationRequest(
+                                    title = "Edit Loan?",
+                                    message = "Changes to repayments, previous payments, amounts, or dates may rebuild this loan repayment schedule.",
+                                    confirmLabel = "Continue",
+                                    onConfirm = { onOpen(item.id) }
+                                )
+                            } else {
+                                onOpen(item.id)
+                            }
                         },
                         modifier =
                             Modifier.fillMaxWidth()
@@ -2618,13 +2719,36 @@ fun LoanList(
 
                     Row {
                         if (loanCompleted(item) && !item.archived) {
-                            TextButton(onClick = { viewModel.reopenLoan(item.id) }) {
+                            TextButton(onClick = {
+                                pendingAction = ConfirmationRequest(
+                                    title = "Reopen Loan?",
+                                    message = "The latest repayment will return to Pending, this loan will move to Active, and reminders may resume.",
+                                    confirmLabel = "Reopen",
+                                    onConfirm = { viewModel.reopenLoan(item.id) }
+                                )
+                            }) {
                                 Text("Reopen")
                             }
                         }
 
                         TextButton(
-                            onClick = { viewModel.setLoanArchived(item.id, !item.archived) }
+                            onClick = {
+                                pendingAction = if (item.archived) {
+                                    ConfirmationRequest(
+                                        title = "Restore Loan?",
+                                        message = "This loan will return to Active or Completed according to its repayment status. Reminders resume if payments are pending.",
+                                        confirmLabel = "Restore",
+                                        onConfirm = { viewModel.setLoanArchived(item.id, false) }
+                                    )
+                                } else {
+                                    ConfirmationRequest(
+                                        title = "Archive Loan?",
+                                        message = "This loan will leave normal lists and pending reminders will stop. Its history will remain available.",
+                                        confirmLabel = "Archive",
+                                        onConfirm = { viewModel.setLoanArchived(item.id, true) }
+                                    )
+                                }
+                            }
                         ) {
                             Text(if (item.archived) "Restore" else "Archive")
                         }
@@ -2649,6 +2773,10 @@ fun LoanList(
             onDismiss = { pendingDelete = null }
         )
     }
+
+    pendingAction?.let { request ->
+        ConfirmationDialog(request) { pendingAction = null }
+    }
 }
 
 
@@ -2663,6 +2791,7 @@ fun DebtList(
 ) {
 
     var pendingDelete by remember { mutableStateOf<Debt?>(null) }
+    var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
     val visibleItems = viewModel.data.debts.filter { item ->
         when (statusFilter) {
@@ -2790,7 +2919,16 @@ fun DebtList(
 
                     OutlinedButton(
                         onClick = {
-                            onOpen(item.id)
+                            if (!item.archived && !debtCompleted(item)) {
+                                pendingAction = ConfirmationRequest(
+                                    title = "Edit Debt?",
+                                    message = "You are opening an active debt record where payments and notes can be changed.",
+                                    confirmLabel = "Continue",
+                                    onConfirm = { onOpen(item.id) }
+                                )
+                            } else {
+                                onOpen(item.id)
+                            }
                         },
                         modifier =
                             Modifier.fillMaxWidth()
@@ -2800,13 +2938,36 @@ fun DebtList(
 
                     Row {
                         if (debtCompleted(item) && !item.archived) {
-                            TextButton(onClick = { viewModel.reopenDebt(item.id) }) {
+                            TextButton(onClick = {
+                                pendingAction = ConfirmationRequest(
+                                    title = "Reopen Debt?",
+                                    message = "The latest payment will return to Pending and this debt will move back to Active.",
+                                    confirmLabel = "Reopen",
+                                    onConfirm = { viewModel.reopenDebt(item.id) }
+                                )
+                            }) {
                                 Text("Reopen")
                             }
                         }
 
                         TextButton(
-                            onClick = { viewModel.setDebtArchived(item.id, !item.archived) }
+                            onClick = {
+                                pendingAction = if (item.archived) {
+                                    ConfirmationRequest(
+                                        title = "Restore Debt?",
+                                        message = "This debt will return to Active or Completed according to its payment status.",
+                                        confirmLabel = "Restore",
+                                        onConfirm = { viewModel.setDebtArchived(item.id, false) }
+                                    )
+                                } else {
+                                    ConfirmationRequest(
+                                        title = "Archive Debt?",
+                                        message = "This debt will leave normal lists, but its complete payment history will remain available.",
+                                        confirmLabel = "Archive",
+                                        onConfirm = { viewModel.setDebtArchived(item.id, true) }
+                                    )
+                                }
+                            }
                         ) {
                             Text(if (item.archived) "Restore" else "Archive")
                         }
@@ -2830,6 +2991,10 @@ fun DebtList(
             },
             onDismiss = { pendingDelete = null }
         )
+    }
+
+    pendingAction?.let { request ->
+        ConfirmationDialog(request) { pendingAction = null }
     }
 }
 
@@ -2873,6 +3038,7 @@ fun ExpenseList(
 ) {
     var viewMode by remember { mutableStateOf("DAILY") }
     var pendingDelete by remember { mutableStateOf<Expense?>(null) }
+    var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var allMonths by remember { mutableStateOf(false) }
     var selectedMonth by remember {
         mutableStateOf(
@@ -3096,7 +3262,14 @@ fun ExpenseList(
                             }
 
                             Row {
-                                TextButton(onClick = { onOpen(expense.id) }) {
+                                TextButton(onClick = {
+                                    pendingAction = ConfirmationRequest(
+                                        title = "Edit Expense?",
+                                        message = "You are about to change ${expense.title} for ${money(expense.amount)}.",
+                                        confirmLabel = "Edit",
+                                        onConfirm = { onOpen(expense.id) }
+                                    )
+                                }) {
                                     Text("Edit")
                                 }
                                 TextButton(onClick = { pendingDelete = expense }) {
@@ -3122,6 +3295,10 @@ fun ExpenseList(
             onDismiss = { pendingDelete = null }
         )
     }
+
+    pendingAction?.let { request ->
+        ConfirmationDialog(request) { pendingAction = null }
+    }
 }
 
 
@@ -3138,6 +3315,7 @@ fun PaymentHistory(
     val context = LocalContext.current
     var editingPayment by remember { mutableStateOf<Payment?>(null) }
     var receiptPayment by remember { mutableStateOf<Payment?>(null) }
+    var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
 
     val receiptLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -3250,17 +3428,31 @@ fun PaymentHistory(
                         if (payment.paidDate != null) {
                             TextButton(
                                 onClick = {
-                                    onUpdate(
-                                        payment.copy(
-                                            paidDate = null,
-                                            status = "PENDING"
-                                        )
+                                    pendingAction = ConfirmationRequest(
+                                        title = "Undo Paid?",
+                                        message = "Payment ${payment.number} for ${money(payment.amount)} will return to Pending. The plan balance and completion status will be recalculated.",
+                                        confirmLabel = "Undo Paid",
+                                        onConfirm = {
+                                            onUpdate(
+                                                payment.copy(
+                                                    paidDate = null,
+                                                    status = "PENDING"
+                                                )
+                                            )
+                                        }
                                     )
                                 }
                             ) { Text("Undo Paid") }
                         }
 
-                        TextButton(onClick = { editingPayment = payment }) {
+                        TextButton(onClick = {
+                            pendingAction = ConfirmationRequest(
+                                title = "Edit Payment?",
+                                message = "You are about to change payment ${payment.number}, including its dates or notes.",
+                                confirmLabel = "Edit",
+                                onConfirm = { editingPayment = payment }
+                            )
+                        }) {
                             Text("Edit")
                         }
 
@@ -3292,12 +3484,21 @@ fun PaymentHistory(
     editingPayment?.let { payment ->
         PaymentEditDialog(
             payment = payment,
-            onSave = {
-                onUpdate?.invoke(it)
+            onSave = { updatedPayment ->
                 editingPayment = null
+                pendingAction = ConfirmationRequest(
+                    title = "Update Payment?",
+                    message = "Save the new dates and notes for payment ${updatedPayment.number}?",
+                    confirmLabel = "Update",
+                    onConfirm = { onUpdate?.invoke(updatedPayment) }
+                )
             },
             onDismiss = { editingPayment = null }
         )
+    }
+
+    pendingAction?.let { request ->
+        ConfirmationDialog(request) { pendingAction = null }
     }
 }
 
@@ -3367,6 +3568,9 @@ fun EmiForm(
     existing: EmiItem?,
     done: () -> Unit
 ) {
+
+    val viewOnly = existing?.let { it.archived || emiCompleted(it) } == true
+    var pendingUpdate by remember { mutableStateOf<EmiItem?>(null) }
 
     var name by remember {
         mutableStateOf(
@@ -3495,10 +3699,25 @@ fun EmiForm(
         title =
             if (existing == null) {
                 "Add EMI"
+            } else if (viewOnly) {
+                "EMI Details"
             } else {
                 "Edit EMI"
-            }
+            },
+        readOnly = viewOnly
     ) {
+
+        if (viewOnly && existing != null) {
+            Text(
+                if (existing.archived) {
+                    "This EMI is archived and view-only. Restore it to make changes."
+                } else {
+                    "This EMI is completed and view-only. Reopen it to make changes."
+                },
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
         Field(
             "Item name",
@@ -3620,6 +3839,7 @@ fun EmiForm(
             )
         }
 
+        if (!viewOnly) {
         Button(
 
             onClick = {
@@ -3777,11 +3997,10 @@ fun EmiForm(
 
                     if (existing == null) {
                         viewModel.addEmi(item)
+                        done()
                     } else {
-                        viewModel.updateEmi(item)
+                        pendingUpdate = item
                     }
-
-                    done()
                 }
             },
 
@@ -3798,6 +4017,7 @@ fun EmiForm(
                 }
             )
         }
+        }
 
         if (existing != null) {
 
@@ -3811,14 +4031,27 @@ fun EmiForm(
             )
 
             PaymentHistory(
-                existing.payments
-            ) {
-                viewModel.updateEmiPayment(
-                    existing.id,
-                    it
-                )
-            }
+                payments = existing.payments,
+                onUpdate = if (viewOnly) null else {
+                    { payment -> viewModel.updateEmiPayment(existing.id, payment) }
+                }
+            )
         }
+    }
+
+    pendingUpdate?.let { item ->
+        ConfirmationDialog(
+            request = ConfirmationRequest(
+                title = "Update EMI?",
+                message = "The new values will replace this EMI plan. Changes to amounts, installments, previous payments, or dates may rebuild its payment schedule.",
+                confirmLabel = "Update",
+                onConfirm = {
+                    viewModel.updateEmi(item)
+                    done()
+                }
+            ),
+            onDismiss = { pendingUpdate = null }
+        )
     }
 }
 
@@ -3833,6 +4066,9 @@ fun LoanForm(
     existing: Loan?,
     done: () -> Unit
 ) {
+
+    val viewOnly = existing?.let { it.archived || loanCompleted(it) } == true
+    var pendingUpdate by remember { mutableStateOf<Loan?>(null) }
 
     var name by remember {
         mutableStateOf(
@@ -3979,10 +4215,25 @@ fun LoanForm(
         title =
             if (existing == null) {
                 "Add Loan"
+            } else if (viewOnly) {
+                "Loan Details"
             } else {
                 "Edit Loan"
-            }
+            },
+        readOnly = viewOnly
     ) {
+
+        if (viewOnly && existing != null) {
+            Text(
+                if (existing.archived) {
+                    "This loan is archived and view-only. Restore it to make changes."
+                } else {
+                    "This loan is completed and view-only. Reopen it to make changes."
+                },
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
         Field(
             "Loan name",
@@ -4118,6 +4369,7 @@ fun LoanForm(
             )
         }
 
+        if (!viewOnly) {
         Button(
 
             onClick = {
@@ -4268,11 +4520,10 @@ fun LoanForm(
 
                     if (existing == null) {
                         viewModel.addLoan(loan)
+                        done()
                     } else {
-                        viewModel.updateLoan(loan)
+                        pendingUpdate = loan
                     }
-
-                    done()
                 }
             },
 
@@ -4289,6 +4540,7 @@ fun LoanForm(
                 }
             )
         }
+        }
 
         if (existing != null) {
 
@@ -4302,14 +4554,27 @@ fun LoanForm(
             )
 
             PaymentHistory(
-                existing.payments
-            ) {
-                viewModel.updateLoanPayment(
-                    existing.id,
-                    it
-                )
-            }
+                payments = existing.payments,
+                onUpdate = if (viewOnly) null else {
+                    { payment -> viewModel.updateLoanPayment(existing.id, payment) }
+                }
+            )
         }
+    }
+
+    pendingUpdate?.let { loan ->
+        ConfirmationDialog(
+            request = ConfirmationRequest(
+                title = "Update Loan?",
+                message = "The new values will replace this loan plan. Changes to amounts, repayments, previous payments, or dates may rebuild its repayment schedule.",
+                confirmLabel = "Update",
+                onConfirm = {
+                    viewModel.updateLoan(loan)
+                    done()
+                }
+            ),
+            onDismiss = { pendingUpdate = null }
+        )
     }
 }
 
@@ -4324,6 +4589,8 @@ fun DebtForm(
     existing: Debt?,
     done: () -> Unit
 ) {
+
+    val viewOnly = existing?.let { it.archived || debtCompleted(it) } == true
 
     var name by remember {
         mutableStateOf(
@@ -4367,10 +4634,25 @@ fun DebtForm(
         title =
             if (existing == null) {
                 "Add Debt"
-            } else {
+            } else if (viewOnly) {
                 "Debt Details"
-            }
+            } else {
+                "Edit Debt"
+            },
+        readOnly = viewOnly
     ) {
+
+        if (viewOnly && existing != null) {
+            Text(
+                if (existing.archived) {
+                    "This debt is archived and view-only. Restore it to make changes."
+                } else {
+                    "This debt is completed and view-only. Reopen it to make changes."
+                },
+                color = MaterialTheme.colorScheme.secondary,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
         Field(
             "Person / organization",
@@ -4481,6 +4763,7 @@ fun DebtForm(
                 }
             }
 
+            if (!viewOnly) {
             Field(
                 "New payment amount",
                 payment
@@ -4533,6 +4816,7 @@ fun DebtForm(
                     "Add Payment"
                 )
             }
+            }
 
             Text(
                 "Payment History",
@@ -4544,10 +4828,11 @@ fun DebtForm(
             )
 
             PaymentHistory(
-                existing.payments
-            ) {
-                viewModel.updateDebtPayment(existing.id, it)
-            }
+                payments = existing.payments,
+                onUpdate = if (viewOnly) null else {
+                    { payment -> viewModel.updateDebtPayment(existing.id, payment) }
+                }
+            )
 
         } else {
 
@@ -4627,6 +4912,7 @@ fun ExpenseForm(
     existing: Expense?,
     done: () -> Unit
 ) {
+    var pendingUpdate by remember { mutableStateOf<Expense?>(null) }
     var title by remember { mutableStateOf(existing?.title ?: "") }
     var category by remember { mutableStateOf(existing?.category ?: "Food") }
     var amount by remember { mutableStateOf(existing?.amount?.toString() ?: "") }
@@ -4693,10 +4979,10 @@ fun ExpenseForm(
 
                     if (existing == null) {
                         viewModel.addExpense(expense)
+                        done()
                     } else {
-                        viewModel.updateExpense(expense)
+                        pendingUpdate = expense
                     }
-                    done()
                 }
             },
             modifier = Modifier.fillMaxWidth()
@@ -4707,6 +4993,21 @@ fun ExpenseForm(
         OutlinedButton(onClick = done, modifier = Modifier.fillMaxWidth()) {
             Text("Cancel")
         }
+    }
+
+    pendingUpdate?.let { expense ->
+        ConfirmationDialog(
+            request = ConfirmationRequest(
+                title = "Update Expense?",
+                message = "Save these changes to ${expense.title} for ${money(expense.amount)}?",
+                confirmLabel = "Update",
+                onConfirm = {
+                    viewModel.updateExpense(expense)
+                    done()
+                }
+            ),
+            onDismiss = { pendingUpdate = null }
+        )
     }
 }
 
@@ -4820,7 +5121,8 @@ fun ChoiceDropdown(
     Box(modifier = Modifier.fillMaxWidth()) {
         OutlinedButton(
             onClick = { expanded = true },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !LocalFormReadOnly.current
         ) { Text("$label: $value") }
         DropdownMenu(
             expanded = expanded,
@@ -4842,6 +5144,7 @@ fun ChoiceDropdown(
 @Composable
 fun FormColumn(
     title: String,
+    readOnly: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
 
@@ -4870,12 +5173,12 @@ fun FormColumn(
         }
 
         item {
-
-            Column(
-                verticalArrangement =
-                    Arrangement.spacedBy(10.dp),
-                content = content
-            )
+            CompositionLocalProvider(LocalFormReadOnly provides readOnly) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    content = content
+                )
+            }
         }
     }
 }
@@ -4906,7 +5209,8 @@ fun DatePickerField(
                 calendar.get(Calendar.DAY_OF_MONTH)
             ).show()
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !LocalFormReadOnly.current
     ) {
         Text("$label: $value")
     }
@@ -4947,6 +5251,8 @@ fun Field(
 
         modifier =
             Modifier.fillMaxWidth(),
+
+        enabled = !LocalFormReadOnly.current,
 
         keyboardOptions = KeyboardOptions(
             keyboardType = if (numberField) KeyboardType.Decimal else KeyboardType.Text
@@ -5731,6 +6037,7 @@ class MainActivity : ComponentActivity() {
     private fun showContent() {
 
         setContent {
+            MaterialTheme(colorScheme = AppColorScheme) {
 
             if (!security.hasPassword()) {
 
@@ -5770,6 +6077,7 @@ class MainActivity : ComponentActivity() {
                     },
                     verifyPassword = { password -> security.verify(password) }
                 )
+            }
             }
         }
     }
@@ -5812,11 +6120,10 @@ fun SetupScreen(
 
     ) {
 
-        Icon(
-            Icons.Default.Lock,
-            contentDescription = null,
-            modifier =
-                Modifier.size(64.dp)
+        Image(
+            painter = painterResource(com.example.myemitracker.R.drawable.app_logo),
+            contentDescription = "My Finance Tracker logo",
+            modifier = Modifier.size(112.dp)
         )
 
         Text(
@@ -5937,11 +6244,10 @@ fun LockScreen(
 
     ) {
 
-        Icon(
-            Icons.Default.Lock,
-            contentDescription = null,
-            modifier =
-                Modifier.size(64.dp)
+        Image(
+            painter = painterResource(com.example.myemitracker.R.drawable.app_logo),
+            contentDescription = "My Finance Tracker logo",
+            modifier = Modifier.size(112.dp)
         )
 
         Text(
@@ -5957,9 +6263,7 @@ fun LockScreen(
             Modifier.height(8.dp)
         )
 
-        Text(
-            "Enter your app password to continue."
-        )
+        Text("Your private offline finance tracker")
 
         Spacer(
             Modifier.height(16.dp)
@@ -6007,7 +6311,9 @@ fun LockScreen(
             },
 
             modifier =
-                Modifier.fillMaxWidth()
+                Modifier.fillMaxWidth(),
+
+            enabled = password.isNotBlank()
 
         ) {
 
@@ -6015,5 +6321,13 @@ fun LockScreen(
                 "Unlock"
             )
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            "Your financial data stays on this device.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.secondary
+        )
     }
 }
