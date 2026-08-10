@@ -1,13 +1,8 @@
-My EMI Tracker - Version 1
+My Finance Tracker - Version 4.4
 
-This is a complete Android Studio project source for a personal offline EMI tracker.
+Package: com.example.myemitracker
+Version code: 8
 
-Package:
-com.example.myemitracker
+Offline Android finance tracker with EMI, loan, debt, expense, payment history, receipt attachment, local JSON backup/restore, and PDF reports.
 
-Version:
-1.0
-
-The app does not require an online account or backend.
-
-For the next version, automatic EMI reminder scheduling can be added.
+GitHub builds must use the permanent signing secrets described in README.md. Never commit a .p12, .jks, or keystore file.

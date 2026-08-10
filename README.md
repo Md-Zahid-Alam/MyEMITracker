@@ -1,35 +1,26 @@
-# My Finance Tracker — Version 3
+# My Finance Tracker — Version 4.4
 
-Offline/local Android finance tracker.
+Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Included
+## Version 4.4 updates
 
-- App password lock with PBKDF2-HMAC-SHA256 protected credential
-- Optional fingerprint/biometric unlock
-- EMI tracking for phones, electronics, appliances, vehicles, furniture and other items
-- EMI interest amount/rate field
-- Financed amount
-- Previous installment support
-- Payment history and progress
-- Custom reminder days
-- Separate loan tracking
-- Separate debt tracking
-- Local JSON backup/restore
-- Local PDF reports
-- No Supabase/Firebase/cloud account in Version 3
+- Permanent APK signing support for reliable in-place updates
+- New teal wallet app logo and refreshed login screen
+- Add button appears only on the main Payments and Expenses pages
+- Completed and archived plans open in view-only mode
+- Confirmation warnings for edit, update, undo paid, archive, restore, and reopen actions
+- Improved Completed filter sizing and light teal selected controls
+- Forms hide the bottom navigation to reduce accidental navigation
+
+## Private local data
+
+The app stores data on the device and supports JSON backup and restore. Before moving from an older APK signed with a different key, export a JSON backup, uninstall the old app once, install V4.4, and restore the backup.
 
 ## Build
 
-Use GitHub Actions workflow:
+The GitHub Actions workflow requires two repository secrets:
 
-`.github/workflows/build-apk.yml`
+- `MFT_SIGNING_KEY_BASE64`
+- `MFT_SIGNING_PASSWORD`
 
-It runs:
-
-`gradle :app:assembleDebug --no-daemon`
-
-The APK is uploaded as an Actions artifact.
-
-## Important
-
-Version 3 is intentionally offline. Version 4 can add account/cloud synchronization later.
+The signed APK is uploaded as the `My-Finance-Tracker-V4.4-signed` Actions artifact. Keep the permanent signing key private and backed up.
