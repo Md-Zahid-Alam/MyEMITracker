@@ -41,6 +41,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Description
@@ -64,6 +65,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -114,8 +117,9 @@ private const val KEY_DATA = "data"
 private const val KEY_PASSWORD_HASH = "password_hash"
 private const val KEY_PASSWORD_SALT = "password_salt"
 private const val CHANNEL_ID = "finance_reminders"
+private const val KEY_THEME_MODE = "theme_mode"
 
-private val AppColorScheme = lightColorScheme(
+private val AppLightColorScheme = lightColorScheme(
     primary = Color(0xFF007C7A),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFC8F2EE),
@@ -124,6 +128,22 @@ private val AppColorScheme = lightColorScheme(
     tertiary = Color(0xFF356A5F),
     tertiaryContainer = Color(0xFFD2F2EB),
     onTertiaryContainer = Color(0xFF123D36)
+)
+
+private val AppDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF70DAD3),
+    onPrimary = Color(0xFF003735),
+    primaryContainer = Color(0xFF00504E),
+    onPrimaryContainer = Color(0xFFC8F2EE),
+    secondary = Color(0xFF9ACFC9),
+    tertiary = Color(0xFF8FD7CC),
+    tertiaryContainer = Color(0xFF174D48),
+    onTertiaryContainer = Color(0xFFD2F2EB),
+    background = Color(0xFF101414),
+    surface = Color(0xFF171C1C),
+    surfaceVariant = Color(0xFF24302F),
+    onBackground = Color(0xFFE1E7E5),
+    onSurface = Color(0xFFE1E7E5)
 )
 
 private val LocalFormReadOnly = staticCompositionLocalOf { false }
@@ -1685,7 +1705,9 @@ fun financeViewModel(
 fun FinanceApp(
     onLogout: () -> Unit,
     onPasswordChange: (String) -> Unit,
-    verifyPassword: (String) -> Boolean
+    verifyPassword: (String) -> Boolean,
+    themeMode: String,
+    onThemeChange: (String) -> Unit
 ) {
 
     val context =
@@ -1765,8 +1787,8 @@ fun FinanceApp(
     Scaffold(
 
         topBar = {
-
-            TopAppBar(
+            if (selectedType.isBlank()) {
+                TopAppBar(
 
                 title = {
                     Text(
@@ -1774,7 +1796,8 @@ fun FinanceApp(
                         fontWeight = FontWeight.Bold
                     )
                 }
-            )
+                )
+            }
         },
 
         bottomBar = {
@@ -1964,7 +1987,9 @@ fun FinanceApp(
                             arrayOf("application/json", "text/plain", "*/*")
                         )
                     },
-                    onLock = onLogout
+                    onLock = onLogout,
+                    themeMode = themeMode,
+                    onThemeChange = onThemeChange
                 )
             }
         }
@@ -1983,6 +2008,9 @@ fun PaymentsHub(
     onSectionChange: (String) -> Unit,
     onOpen: (String, String) -> Unit
 ) {
+    var search by remember { mutableStateOf("") }
+    var sortMode by remember { mutableStateOf("Newest first") }
+
     Column(modifier = Modifier.fillMaxSize()) {
         Text(
             "Payments",
@@ -2007,13 +2035,62 @@ fun PaymentsHub(
             }
         }
 
+        SearchSortControls(
+            search = search,
+            onSearchChange = { search = it },
+            sortMode = sortMode,
+            onSortChange = { sortMode = it },
+            sortOptions = listOf(
+                "Newest first",
+                "Oldest first",
+                "Highest amount",
+                "Lowest amount",
+                "Next due date"
+            ),
+            placeholder = "Search ${section.lowercase()}"
+        )
+
         Box(modifier = Modifier.weight(1f)) {
             when (section) {
-                "EMI" -> EmiList(viewModel) { onOpen("emi", it) }
-                "Loans" -> LoanList(viewModel) { onOpen("loan", it) }
-                else -> DebtList(viewModel) { onOpen("debt", it) }
+                "EMI" -> EmiList(viewModel, search, sortMode) { onOpen("emi", it) }
+                "Loans" -> LoanList(viewModel, search, sortMode) { onOpen("loan", it) }
+                else -> DebtList(viewModel, search, sortMode) { onOpen("debt", it) }
             }
         }
+    }
+}
+
+@Composable
+fun SearchSortControls(
+    search: String,
+    onSearchChange: (String) -> Unit,
+    sortMode: String,
+    onSortChange: (String) -> Unit,
+    sortOptions: List<String>,
+    placeholder: String
+) {
+    Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedTextField(
+            value = search,
+            onValueChange = onSearchChange,
+            label = { Text(placeholder) },
+            singleLine = true,
+            trailingIcon = {
+                if (search.isNotBlank()) {
+                    TextButton(onClick = { onSearchChange("") }) { Text("Clear") }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        )
+        ChoiceDropdown(
+            label = "Sort",
+            value = sortMode,
+            options = sortOptions,
+            onSelect = onSortChange
+        )
     }
 }
 
@@ -2364,18 +2441,35 @@ fun SummaryCard(
 @Composable
 fun EmiList(
     viewModel: FinanceViewModel,
+    search: String,
+    sortMode: String,
     onOpen: (String) -> Unit
 ) {
 
     var pendingDelete by remember { mutableStateOf<EmiItem?>(null) }
     var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
-    val visibleItems = viewModel.data.emis.filter { item ->
-        when (statusFilter) {
+    val filteredItems = viewModel.data.emis.filter { item ->
+        val statusMatches = when (statusFilter) {
             "Archived" -> item.archived
             "Completed" -> !item.archived && emiCompleted(item)
             else -> !item.archived && !emiCompleted(item)
         }
+        statusMatches && (
+            search.isBlank() ||
+            listOf(item.name, item.category, item.seller).any {
+                it.contains(search.trim(), ignoreCase = true)
+            } || item.payments.any { it.notes.contains(search.trim(), ignoreCase = true) }
+        )
+    }
+    val visibleItems = when (sortMode) {
+        "Oldest first" -> filteredItems.sortedBy { it.startDate }
+        "Highest amount" -> filteredItems.sortedByDescending { it.totalPayable }
+        "Lowest amount" -> filteredItems.sortedBy { it.totalPayable }
+        "Next due date" -> filteredItems.sortedBy { item ->
+            item.payments.filter { it.paidDate == null }.minOfOrNull { it.dueDate } ?: Long.MAX_VALUE
+        }
+        else -> filteredItems.sortedByDescending { it.startDate }
     }
 
     LazyColumn(
@@ -2584,18 +2678,35 @@ fun EmiList(
 @Composable
 fun LoanList(
     viewModel: FinanceViewModel,
+    search: String,
+    sortMode: String,
     onOpen: (String) -> Unit
 ) {
 
     var pendingDelete by remember { mutableStateOf<Loan?>(null) }
     var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
-    val visibleItems = viewModel.data.loans.filter { item ->
-        when (statusFilter) {
+    val filteredItems = viewModel.data.loans.filter { item ->
+        val statusMatches = when (statusFilter) {
             "Archived" -> item.archived
             "Completed" -> !item.archived && loanCompleted(item)
             else -> !item.archived && !loanCompleted(item)
         }
+        statusMatches && (
+            search.isBlank() ||
+            listOf(item.name, item.type, item.lender).any {
+                it.contains(search.trim(), ignoreCase = true)
+            } || item.payments.any { it.notes.contains(search.trim(), ignoreCase = true) }
+        )
+    }
+    val visibleItems = when (sortMode) {
+        "Oldest first" -> filteredItems.sortedBy { it.startDate }
+        "Highest amount" -> filteredItems.sortedByDescending { it.totalPayable }
+        "Lowest amount" -> filteredItems.sortedBy { it.totalPayable }
+        "Next due date" -> filteredItems.sortedBy { item ->
+            item.payments.filter { it.paidDate == null }.minOfOrNull { it.dueDate } ?: Long.MAX_VALUE
+        }
+        else -> filteredItems.sortedByDescending { it.startDate }
     }
 
     LazyColumn(
@@ -2787,18 +2898,33 @@ fun LoanList(
 @Composable
 fun DebtList(
     viewModel: FinanceViewModel,
+    search: String,
+    sortMode: String,
     onOpen: (String) -> Unit
 ) {
 
     var pendingDelete by remember { mutableStateOf<Debt?>(null) }
     var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
-    val visibleItems = viewModel.data.debts.filter { item ->
-        when (statusFilter) {
+    val filteredItems = viewModel.data.debts.filter { item ->
+        val statusMatches = when (statusFilter) {
             "Archived" -> item.archived
             "Completed" -> !item.archived && debtCompleted(item)
             else -> !item.archived && !debtCompleted(item)
         }
+        statusMatches && (
+            search.isBlank() ||
+            listOf(item.name, item.direction, item.notes).any {
+                it.contains(search.trim(), ignoreCase = true)
+            } || item.payments.any { it.notes.contains(search.trim(), ignoreCase = true) }
+        )
+    }
+    val visibleItems = when (sortMode) {
+        "Oldest first" -> filteredItems.sortedBy { it.payments.minOfOrNull { payment -> payment.dueDate } ?: 0L }
+        "Highest amount" -> filteredItems.sortedByDescending { it.originalAmount }
+        "Lowest amount" -> filteredItems.sortedBy { it.originalAmount }
+        "Next due date" -> filteredItems.sortedBy { item -> item.dueDate ?: Long.MAX_VALUE }
+        else -> filteredItems.sortedByDescending { it.payments.maxOfOrNull { payment -> payment.dueDate } ?: 0L }
     }
 
     LazyColumn(
@@ -3052,10 +3178,16 @@ fun ExpenseList(
         )
     }
     var search by remember { mutableStateOf("") }
+    var sortMode by remember { mutableStateOf("Newest first") }
     var categoryFilter by remember { mutableStateOf("All") }
     var expandedPeriods by remember { mutableStateOf(emptySet<String>()) }
 
-    val sorted = viewModel.data.expenses.sortedByDescending { it.date }
+    val sorted = when (sortMode) {
+        "Oldest first" -> viewModel.data.expenses.sortedBy { it.date }
+        "Highest amount" -> viewModel.data.expenses.sortedByDescending { it.amount }
+        "Lowest amount" -> viewModel.data.expenses.sortedBy { it.amount }
+        else -> viewModel.data.expenses.sortedByDescending { it.date }
+    }
     val availableCategories = listOf("All") + sorted.map { it.category }.distinct().sorted()
     val selectedPeriodExpenses = if (allMonths) {
         sorted
@@ -3072,6 +3204,7 @@ fun ExpenseList(
         val query = search.trim()
         val matchesSearch = query.isBlank() ||
                 expense.title.contains(query, ignoreCase = true) ||
+                expense.category.contains(query, ignoreCase = true) ||
                 expense.notes.contains(query, ignoreCase = true)
         matchesCategory && matchesSearch
     }
@@ -3161,7 +3294,19 @@ fun ExpenseList(
         }
 
         item {
-            Field("Search expenses", search) { search = it }
+            SearchSortControls(
+                search = search,
+                onSearchChange = { search = it },
+                sortMode = sortMode,
+                onSortChange = { sortMode = it },
+                sortOptions = listOf(
+                    "Newest first",
+                    "Oldest first",
+                    "Highest amount",
+                    "Lowest amount"
+                ),
+                placeholder = "Search expenses"
+            )
         }
 
         item {
@@ -3695,6 +3840,20 @@ fun EmiForm(
             0.0
         }
 
+    val hasUnsavedChanges = !viewOnly && (
+        name != (existing?.name ?: "") ||
+        category != (existing?.category ?: "Electronics") ||
+        seller != (existing?.seller ?: "") ||
+        price != (existing?.price?.toString() ?: "") ||
+        downPayment != (existing?.downPayment?.toString() ?: "0") ||
+        interestRate != (existing?.interestRate?.toString() ?: "0") ||
+        interestAmount != (existing?.interestAmount?.toString() ?: "0") ||
+        installments != (existing?.installments?.toString() ?: "12") ||
+        dueDay != (existing?.dueDay?.toString() ?: "10") ||
+        previousPaid != originalPreviousPaid.toString() ||
+        reminders != (existing?.reminderDays?.joinToString(",") ?: "7,3,1,0")
+    )
+
     FormColumn(
         title =
             if (existing == null) {
@@ -3704,7 +3863,9 @@ fun EmiForm(
             } else {
                 "Edit EMI"
             },
-        readOnly = viewOnly
+        readOnly = viewOnly,
+        onBack = done,
+        hasUnsavedChanges = hasUnsavedChanges
     ) {
 
         if (viewOnly && existing != null) {
@@ -4211,6 +4372,21 @@ fun LoanForm(
     val scheduleCount = scheduledAmounts.size
     val displayedMonthly = if (repaymentMode == "FLEXIBLE") flexibleMonthly else monthly
 
+    val hasUnsavedChanges = !viewOnly && (
+        name != (existing?.name ?: "") ||
+        type != (existing?.type ?: "Office Loan") ||
+        lender != (existing?.lender ?: "") ||
+        principal != (existing?.principal?.toString() ?: "") ||
+        rate != (existing?.interestRate?.toString() ?: "0") ||
+        interest != (existing?.interestAmount?.toString() ?: "0") ||
+        installments != (existing?.installments?.toString() ?: "12") ||
+        repaymentMode != (existing?.repaymentMode ?: "EQUAL") ||
+        flexibleMonthlyPayment != (if (existing?.repaymentMode == "FLEXIBLE") existing.monthlyPayment.toString() else "") ||
+        dueDay != (existing?.dueDay?.toString() ?: "10") ||
+        previous != originalPreviousRepayments.toString() ||
+        reminders != (existing?.reminderDays?.joinToString(",") ?: "7,3,1,0")
+    )
+
     FormColumn(
         title =
             if (existing == null) {
@@ -4220,7 +4396,9 @@ fun LoanForm(
             } else {
                 "Edit Loan"
             },
-        readOnly = viewOnly
+        readOnly = viewOnly,
+        onBack = done,
+        hasUnsavedChanges = hasUnsavedChanges
     ) {
 
         if (viewOnly && existing != null) {
@@ -4630,6 +4808,15 @@ fun DebtForm(
         mutableStateOf("")
     }
 
+    val hasUnsavedChanges = !viewOnly && (
+        name != (existing?.name ?: "") ||
+        direction != (existing?.direction ?: "I Owe") ||
+        amount != (existing?.originalAmount?.toString() ?: "") ||
+        notes != (existing?.notes ?: "") ||
+        payment.isNotBlank() ||
+        previousPayment.isNotBlank()
+    )
+
     FormColumn(
         title =
             if (existing == null) {
@@ -4639,7 +4826,9 @@ fun DebtForm(
             } else {
                 "Edit Debt"
             },
-        readOnly = viewOnly
+        readOnly = viewOnly,
+        onBack = done,
+        hasUnsavedChanges = hasUnsavedChanges
     ) {
 
         if (viewOnly && existing != null) {
@@ -4913,16 +5102,30 @@ fun ExpenseForm(
     done: () -> Unit
 ) {
     var pendingUpdate by remember { mutableStateOf<Expense?>(null) }
+    val initialDate = remember(existing?.id) {
+        expenseDateText(existing?.date ?: System.currentTimeMillis())
+    }
     var title by remember { mutableStateOf(existing?.title ?: "") }
     var category by remember { mutableStateOf(existing?.category ?: "Food") }
     var amount by remember { mutableStateOf(existing?.amount?.toString() ?: "") }
     var date by remember {
-        mutableStateOf(expenseDateText(existing?.date ?: System.currentTimeMillis()))
+        mutableStateOf(initialDate)
     }
     var notes by remember { mutableStateOf(existing?.notes ?: "") }
     var error by remember { mutableStateOf("") }
 
-    FormColumn(if (existing == null) "Add Expense" else "Edit Expense") {
+    val hasUnsavedChanges =
+        title != (existing?.title ?: "") ||
+        category != (existing?.category ?: "Food") ||
+        amount != (existing?.amount?.toString() ?: "") ||
+        date != initialDate ||
+        notes != (existing?.notes ?: "")
+
+    FormColumn(
+        title = if (existing == null) "Add Expense" else "Edit Expense",
+        onBack = done,
+        hasUnsavedChanges = hasUnsavedChanges
+    ) {
         Field("Expense name *", title) { title = it }
 
         ChoiceDropdown(
@@ -5021,10 +5224,32 @@ fun SettingsScreen(
     onChangePassword: () -> Unit,
     onBackup: () -> Unit,
     onRestore: () -> Unit,
-    onLock: () -> Unit
+    onLock: () -> Unit,
+    themeMode: String,
+    onThemeChange: (String) -> Unit
 ) {
     FormColumn("Settings") {
         Text("Security and local data tools")
+
+        Text("Appearance", fontWeight = FontWeight.Bold)
+        ChoiceDropdown(
+            label = "Theme",
+            value = when (themeMode) {
+                "LIGHT" -> "Light"
+                "DARK" -> "Dark"
+                else -> "System default"
+            },
+            options = listOf("System default", "Light", "Dark"),
+            onSelect = { label ->
+                onThemeChange(
+                    when (label) {
+                        "Light" -> "LIGHT"
+                        "Dark" -> "DARK"
+                        else -> "SYSTEM"
+                    }
+                )
+            }
+        )
 
         OutlinedButton(
             onClick = onChangePassword,
@@ -5080,7 +5305,11 @@ fun ChangePasswordForm(
     var confirm by remember { mutableStateOf("") }
     var error by remember { mutableStateOf("") }
 
-    FormColumn("Change Password") {
+    FormColumn(
+        title = "Change Password",
+        onBack = done,
+        hasUnsavedChanges = current.isNotBlank() || newPassword.isNotBlank() || confirm.isNotBlank()
+    ) {
         Text("Your new password replaces the old one securely.")
         Field("Current password", current, isPassword = true) { current = it }
         Field("New password", newPassword, isPassword = true) { newPassword = it }
@@ -5145,8 +5374,24 @@ fun ChoiceDropdown(
 fun FormColumn(
     title: String,
     readOnly: Boolean = false,
+    onBack: (() -> Unit)? = null,
+    hasUnsavedChanges: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
+    val requestBack: () -> Unit = {
+        if (hasUnsavedChanges && !readOnly) {
+            showDiscardDialog = true
+        } else {
+            onBack?.invoke()
+        }
+        Unit
+    }
+
+    BackHandler(enabled = onBack != null) {
+        requestBack()
+    }
 
     LazyColumn(
 
@@ -5161,15 +5406,21 @@ fun FormColumn(
     ) {
 
         item {
-
-            Text(
-                title,
-                style =
-                    MaterialTheme.typography
-                        .headlineSmall,
-                fontWeight =
-                    FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (onBack != null) {
+                    IconButton(onClick = requestBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         item {
@@ -5180,6 +5431,27 @@ fun FormColumn(
                 )
             }
         }
+    }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("Discard your changes?") },
+            text = { Text("Your unsaved changes will be lost.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardDialog = false
+                        onBack?.invoke()
+                    }
+                ) { Text("Discard") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text("Keep editing")
+                }
+            }
+        )
     }
 }
 
@@ -6037,7 +6309,21 @@ class MainActivity : ComponentActivity() {
     private fun showContent() {
 
         setContent {
-            MaterialTheme(colorScheme = AppColorScheme) {
+            val preferences = remember {
+                getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            }
+            var themeMode by remember {
+                mutableStateOf(preferences.getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM")
+            }
+            val useDarkTheme = when (themeMode) {
+                "LIGHT" -> false
+                "DARK" -> true
+                else -> isSystemInDarkTheme()
+            }
+
+            MaterialTheme(
+                colorScheme = if (useDarkTheme) AppDarkColorScheme else AppLightColorScheme
+            ) {
 
             if (!security.hasPassword()) {
 
@@ -6075,7 +6361,12 @@ class MainActivity : ComponentActivity() {
                     onPasswordChange = { password ->
                         security.setPassword(password)
                     },
-                    verifyPassword = { password -> security.verify(password) }
+                    verifyPassword = { password -> security.verify(password) },
+                    themeMode = themeMode,
+                    onThemeChange = { selectedMode ->
+                        themeMode = selectedMode
+                        preferences.edit().putString(KEY_THEME_MODE, selectedMode).apply()
+                    }
                 )
             }
             }
