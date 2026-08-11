@@ -1,16 +1,15 @@
-# My Finance Tracker — Version 4.4
+# My Finance Tracker — Version 4.5
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 4.4 updates
+## Version 4.5 updates
 
-- Permanent APK signing support for reliable in-place updates
-- New teal wallet app logo and refreshed login screen
-- Add button appears only on the main Payments and Expenses pages
-- Completed and archived plans open in view-only mode
-- Confirmation warnings for edit, update, undo paid, archive, restore, and reopen actions
-- Improved Completed filter sizing and light teal selected controls
-- Forms hide the bottom navigation to reduce accidental navigation
+- Consistent teal styling in Light and Dark modes
+- System default, Light, and Dark appearance choices saved locally
+- Search and sorting for EMI, loan, debt, and expense records
+- Clear Back header on every editable form and detail page
+- Unsaved-change warning for the header arrow and Android Back button
+- Bottom navigation remains hidden while a form or detail page is open
 
 ## Private local data
 
@@ -23,4 +22,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The signed APK is uploaded as the `My-Finance-Tracker-V4.4-signed` Actions artifact. Keep the permanent signing key private and backed up.
+The signed APK is uploaded as the `My-Finance-Tracker-V4.5-signed` Actions artifact. Keep the permanent signing key private and backed up.
