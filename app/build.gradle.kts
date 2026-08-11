@@ -12,8 +12,8 @@ android {
         applicationId = "com.example.myemitracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "4.5"
+        versionCode = 10
+        versionName = "4.6"
     }
 
     val stableStorePath = System.getenv("MFT_SIGNING_STORE_FILE")

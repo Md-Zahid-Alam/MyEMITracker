@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -47,10 +48,16 @@ import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -2010,14 +2017,51 @@ fun PaymentsHub(
 ) {
     var search by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf("Newest first") }
+    var searchVisible by remember { mutableStateOf(false) }
+    var sortExpanded by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
-            "Payments",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 16.dp, top = 12.dp)
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "Payments",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            IconButton(onClick = { searchVisible = !searchVisible }) {
+                Icon(if (searchVisible) Icons.Default.Close else Icons.Default.Search, "Search")
+            }
+            Box {
+                IconButton(onClick = { sortExpanded = true }) {
+                    Icon(Icons.Default.Sort, "Sort")
+                }
+                SortMenu(
+                    expanded = sortExpanded,
+                    selected = sortMode,
+                    options = listOf("Newest first", "Oldest first", "Highest amount", "Lowest amount", "Next due date"),
+                    onSelect = { sortMode = it; sortExpanded = false },
+                    onDismiss = { sortExpanded = false }
+                )
+            }
+        }
+
+        if (searchVisible) {
+            OutlinedTextField(
+                value = search,
+                onValueChange = { search = it },
+                label = { Text("Search ${section.lowercase()}") },
+                singleLine = true,
+                trailingIcon = {
+                    if (search.isNotBlank()) {
+                        IconButton(onClick = { search = "" }) { Icon(Icons.Default.Close, "Clear") }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
 
         Row(
             modifier = Modifier
@@ -2026,7 +2070,7 @@ fun PaymentsHub(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             listOf("EMI", "Loans", "Debts").forEach { option ->
-                SelectableButton(
+                CompactTabButton(
                     label = option,
                     selected = section == option,
                     onClick = { onSectionChange(option) },
@@ -2035,21 +2079,6 @@ fun PaymentsHub(
             }
         }
 
-        SearchSortControls(
-            search = search,
-            onSearchChange = { search = it },
-            sortMode = sortMode,
-            onSortChange = { sortMode = it },
-            sortOptions = listOf(
-                "Newest first",
-                "Oldest first",
-                "Highest amount",
-                "Lowest amount",
-                "Next due date"
-            ),
-            placeholder = "Search ${section.lowercase()}"
-        )
-
         Box(modifier = Modifier.weight(1f)) {
             when (section) {
                 "EMI" -> EmiList(viewModel, search, sortMode) { onOpen("emi", it) }
@@ -2057,6 +2086,36 @@ fun PaymentsHub(
                 else -> DebtList(viewModel, search, sortMode) { onOpen("debt", it) }
             }
         }
+    }
+}
+
+@Composable
+fun SortMenu(
+    expanded: Boolean,
+    selected: String,
+    options: List<String>,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        options.forEach { option ->
+            DropdownMenuItem(
+                text = { Text(if (option == selected) "✓ $option" else option) },
+                onClick = { onSelect(option) }
+            )
+        }
+    }
+}
+
+@Composable
+fun CompactTabButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    TextButton(onClick = onClick, modifier = modifier) {
+        Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -2132,11 +2191,36 @@ fun StatusFilterRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         listOf("Active", "Completed", "Archived").forEach { option ->
-            SelectableButton(
+            CompactTabButton(
                 label = option,
                 selected = selected == option,
                 onClick = { onSelect(option) },
                 modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun PlanActionMenu(
+    actions: List<Pair<String, () -> Unit>>,
+    onDelete: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Plan actions")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            actions.forEach { (label, action) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = { expanded = false; action() }
+                )
+            }
+            DropdownMenuItem(
+                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                onClick = { expanded = false; onDelete() }
             )
         }
     }
@@ -2314,8 +2398,7 @@ fun Dashboard(
         item {
 
             Card(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
             ) {
 
                 Column(
@@ -2531,8 +2614,18 @@ fun EmiList(
                 }
 
             Card(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().clickable {
+                    if (!item.archived && !emiCompleted(item)) {
+                        pendingAction = ConfirmationRequest(
+                            title = "Edit EMI?",
+                            message = "Changes to installments, previous payments, amounts, or dates may rebuild this EMI payment schedule.",
+                            confirmLabel = "Continue",
+                            onConfirm = { onOpen(item.id) }
+                        )
+                    } else {
+                        onOpen(item.id)
+                    }
+                }
             ) {
 
                 Column(
@@ -2589,41 +2682,19 @@ fun EmiList(
                         Modifier.height(8.dp)
                     )
 
-                    OutlinedButton(
-                        onClick = {
-                            if (!item.archived && !emiCompleted(item)) {
-                                pendingAction = ConfirmationRequest(
-                                    title = "Edit EMI?",
-                                    message = "Changes to installments, previous payments, amounts, or dates may rebuild this EMI payment schedule.",
-                                    confirmLabel = "Continue",
-                                    onConfirm = { onOpen(item.id) }
-                                )
-                            } else {
-                                onOpen(item.id)
-                            }
-                        },
-                        modifier =
-                            Modifier.fillMaxWidth()
-                    ) {
-                        Text("Open")
-                    }
-
-                    Row {
-                        if (emiCompleted(item) && !item.archived) {
-                            TextButton(onClick = {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        val actions = buildList<Pair<String, () -> Unit>> {
+                            if (emiCompleted(item) && !item.archived) {
+                                add("Reopen" to {
                                 pendingAction = ConfirmationRequest(
                                     title = "Reopen EMI?",
                                     message = "The latest payment will return to Pending, this EMI will move to Active, and reminders may resume.",
                                     confirmLabel = "Reopen",
                                     onConfirm = { viewModel.reopenEmi(item.id) }
                                 )
-                            }) {
-                                Text("Reopen")
+                                })
                             }
-                        }
-
-                        TextButton(
-                            onClick = {
+                            add((if (item.archived) "Restore" else "Archive") to {
                                 pendingAction = if (item.archived) {
                                     ConfirmationRequest(
                                         title = "Restore EMI?",
@@ -2639,14 +2710,9 @@ fun EmiList(
                                         onConfirm = { viewModel.setEmiArchived(item.id, true) }
                                     )
                                 }
-                            }
-                        ) {
-                            Text(if (item.archived) "Restore" else "Archive")
+                            })
                         }
-
-                        TextButton(onClick = { pendingDelete = item }) {
-                            Text("Delete", color = MaterialTheme.colorScheme.error)
-                        }
+                        PlanActionMenu(actions = actions, onDelete = { pendingDelete = item })
                     }
                 }
             }
@@ -2755,8 +2821,18 @@ fun LoanList(
                 }
 
             Card(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().clickable {
+                    if (!item.archived && !loanCompleted(item)) {
+                        pendingAction = ConfirmationRequest(
+                            title = "Edit Loan?",
+                            message = "Changes to repayments, previous payments, amounts, or dates may rebuild this loan repayment schedule.",
+                            confirmLabel = "Continue",
+                            onConfirm = { onOpen(item.id) }
+                        )
+                    } else {
+                        onOpen(item.id)
+                    }
+                }
             ) {
 
                 Column(
@@ -2809,41 +2885,19 @@ fun LoanList(
                         Modifier.height(8.dp)
                     )
 
-                    OutlinedButton(
-                        onClick = {
-                            if (!item.archived && !loanCompleted(item)) {
-                                pendingAction = ConfirmationRequest(
-                                    title = "Edit Loan?",
-                                    message = "Changes to repayments, previous payments, amounts, or dates may rebuild this loan repayment schedule.",
-                                    confirmLabel = "Continue",
-                                    onConfirm = { onOpen(item.id) }
-                                )
-                            } else {
-                                onOpen(item.id)
-                            }
-                        },
-                        modifier =
-                            Modifier.fillMaxWidth()
-                    ) {
-                        Text("Open")
-                    }
-
-                    Row {
-                        if (loanCompleted(item) && !item.archived) {
-                            TextButton(onClick = {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        val actions = buildList<Pair<String, () -> Unit>> {
+                            if (loanCompleted(item) && !item.archived) {
+                                add("Reopen" to {
                                 pendingAction = ConfirmationRequest(
                                     title = "Reopen Loan?",
                                     message = "The latest repayment will return to Pending, this loan will move to Active, and reminders may resume.",
                                     confirmLabel = "Reopen",
                                     onConfirm = { viewModel.reopenLoan(item.id) }
                                 )
-                            }) {
-                                Text("Reopen")
+                                })
                             }
-                        }
-
-                        TextButton(
-                            onClick = {
+                            add((if (item.archived) "Restore" else "Archive") to {
                                 pendingAction = if (item.archived) {
                                     ConfirmationRequest(
                                         title = "Restore Loan?",
@@ -2859,14 +2913,9 @@ fun LoanList(
                                         onConfirm = { viewModel.setLoanArchived(item.id, true) }
                                     )
                                 }
-                            }
-                        ) {
-                            Text(if (item.archived) "Restore" else "Archive")
+                            })
                         }
-
-                        TextButton(onClick = { pendingDelete = item }) {
-                            Text("Delete", color = MaterialTheme.colorScheme.error)
-                        }
+                        PlanActionMenu(actions = actions, onDelete = { pendingDelete = item })
                     }
                 }
             }
@@ -2987,8 +3036,18 @@ fun DebtList(
                 }
 
             Card(
-                modifier =
-                    Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().clickable {
+                    if (!item.archived && !debtCompleted(item)) {
+                        pendingAction = ConfirmationRequest(
+                            title = "Edit Debt?",
+                            message = "You are opening an active debt record where payments and notes can be changed.",
+                            confirmLabel = "Continue",
+                            onConfirm = { onOpen(item.id) }
+                        )
+                    } else {
+                        onOpen(item.id)
+                    }
+                }
             ) {
 
                 Column(
@@ -3043,41 +3102,19 @@ fun DebtList(
                         Modifier.height(8.dp)
                     )
 
-                    OutlinedButton(
-                        onClick = {
-                            if (!item.archived && !debtCompleted(item)) {
-                                pendingAction = ConfirmationRequest(
-                                    title = "Edit Debt?",
-                                    message = "You are opening an active debt record where payments and notes can be changed.",
-                                    confirmLabel = "Continue",
-                                    onConfirm = { onOpen(item.id) }
-                                )
-                            } else {
-                                onOpen(item.id)
-                            }
-                        },
-                        modifier =
-                            Modifier.fillMaxWidth()
-                    ) {
-                        Text("Open")
-                    }
-
-                    Row {
-                        if (debtCompleted(item) && !item.archived) {
-                            TextButton(onClick = {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        val actions = buildList<Pair<String, () -> Unit>> {
+                            if (debtCompleted(item) && !item.archived) {
+                                add("Reopen" to {
                                 pendingAction = ConfirmationRequest(
                                     title = "Reopen Debt?",
                                     message = "The latest payment will return to Pending and this debt will move back to Active.",
                                     confirmLabel = "Reopen",
                                     onConfirm = { viewModel.reopenDebt(item.id) }
                                 )
-                            }) {
-                                Text("Reopen")
+                                })
                             }
-                        }
-
-                        TextButton(
-                            onClick = {
+                            add((if (item.archived) "Restore" else "Archive") to {
                                 pendingAction = if (item.archived) {
                                     ConfirmationRequest(
                                         title = "Restore Debt?",
@@ -3093,14 +3130,9 @@ fun DebtList(
                                         onConfirm = { viewModel.setDebtArchived(item.id, true) }
                                     )
                                 }
-                            }
-                        ) {
-                            Text(if (item.archived) "Restore" else "Archive")
+                            })
                         }
-
-                        TextButton(onClick = { pendingDelete = item }) {
-                            Text("Delete", color = MaterialTheme.colorScheme.error)
-                        }
+                        PlanActionMenu(actions = actions, onDelete = { pendingDelete = item })
                     }
                 }
             }
@@ -3179,6 +3211,9 @@ fun ExpenseList(
     }
     var search by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf("Newest first") }
+    var searchVisible by remember { mutableStateOf(false) }
+    var sortExpanded by remember { mutableStateOf(false) }
+    var categorySummaryExpanded by remember { mutableStateOf(false) }
     var categoryFilter by remember { mutableStateOf("All") }
     var expandedPeriods by remember { mutableStateOf(emptySet<String>()) }
 
@@ -3223,11 +3258,27 @@ fun ExpenseList(
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         item {
-            Text(
-                "Expenses",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Expenses",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { searchVisible = !searchVisible }) {
+                    Icon(if (searchVisible) Icons.Default.Close else Icons.Default.Search, "Search")
+                }
+                Box {
+                    IconButton(onClick = { sortExpanded = true }) { Icon(Icons.Default.Sort, "Sort") }
+                    SortMenu(
+                        expanded = sortExpanded,
+                        selected = sortMode,
+                        options = listOf("Newest first", "Oldest first", "Highest amount", "Lowest amount"),
+                        onSelect = { sortMode = it; sortExpanded = false },
+                        onDismiss = { sortExpanded = false }
+                    )
+                }
+            }
         }
 
         item {
@@ -3235,13 +3286,13 @@ fun ExpenseList(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                SelectableButton(
+                CompactTabButton(
                     label = "Daily",
                     selected = viewMode == "DAILY",
                     onClick = { viewMode = "DAILY" },
                     modifier = Modifier.weight(1f)
                 )
-                SelectableButton(
+                CompactTabButton(
                     label = "Monthly",
                     selected = viewMode == "MONTHLY",
                     onClick = { viewMode = "MONTHLY" },
@@ -3256,57 +3307,44 @@ fun ExpenseList(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
+                IconButton(
                     onClick = {
                         selectedMonth = addMonths(selectedMonth, -1)
                         allMonths = false
                         expandedPeriods = emptySet()
                     }
-                ) { Text("Previous") }
+                ) { Icon(Icons.Default.KeyboardArrowLeft, "Previous month") }
 
-                SelectableButton(
-                    label = expenseMonthKey(selectedMonth),
-                    selected = !allMonths,
-                    onClick = { allMonths = false },
+                TextButton(
+                    onClick = { allMonths = !allMonths },
                     modifier = Modifier.weight(1f)
-                )
+                ) { Text(if (allMonths) "All Months" else expenseMonthKey(selectedMonth), fontWeight = FontWeight.Bold) }
 
-                OutlinedButton(
+                IconButton(
                     onClick = {
                         selectedMonth = addMonths(selectedMonth, 1)
                         allMonths = false
                         expandedPeriods = emptySet()
                     }
-                ) { Text("Next") }
+                ) { Icon(Icons.Default.KeyboardArrowRight, "Next month") }
             }
         }
 
-        item {
-            SelectableButton(
-                label = "All Months",
-                selected = allMonths,
-                onClick = {
-                    allMonths = true
-                    expandedPeriods = emptySet()
-                },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        item {
-            SearchSortControls(
-                search = search,
-                onSearchChange = { search = it },
-                sortMode = sortMode,
-                onSortChange = { sortMode = it },
-                sortOptions = listOf(
-                    "Newest first",
-                    "Oldest first",
-                    "Highest amount",
-                    "Lowest amount"
-                ),
-                placeholder = "Search expenses"
-            )
+        if (searchVisible) {
+            item {
+                OutlinedTextField(
+                    value = search,
+                    onValueChange = { search = it },
+                    label = { Text("Search expenses") },
+                    singleLine = true,
+                    trailingIcon = {
+                        if (search.isNotBlank()) {
+                            IconButton(onClick = { search = "" }) { Icon(Icons.Default.Close, "Clear") }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
 
         item {
@@ -3324,27 +3362,30 @@ fun ExpenseList(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    Text(if (allMonths) "Total spending" else "Spent this month")
                     Text(
-                        if (allMonths) "All Months by Category" else "${expenseMonthKey(selectedMonth)} by Category",
-                        style = MaterialTheme.typography.titleMedium,
+                        money(selectedPeriodExpenses.sumOf { it.amount }),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
                     )
-                    if (categoryTotals.isEmpty()) {
-                        Text("No expenses recorded for this period.")
-                    } else {
-                        categoryTotals.forEach { (category, total) ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(category)
-                                Text(money(total), fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { categorySummaryExpanded = !categorySummaryExpanded }) {
+                        Text(if (categorySummaryExpanded) "Hide category summary" else "View category summary")
+                    }
+                    if (categorySummaryExpanded) {
+                        if (categoryTotals.isEmpty()) {
+                            Text("No expenses recorded for this period.")
+                        } else {
+                            categoryTotals.forEach { (category, total) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(category)
+                                    Text(money(total), fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
-                        Text(
-                            "Total: ${money(selectedPeriodExpenses.sumOf { it.amount })}",
-                            fontWeight = FontWeight.Bold
-                        )
                     }
                 }
             }
