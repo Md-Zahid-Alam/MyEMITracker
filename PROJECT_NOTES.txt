@@ -1,7 +1,7 @@
-My Finance Tracker - Version 4.5
+My Finance Tracker - Version 4.6
 
 Package: com.example.myemitracker
-Version code: 9
+Version code: 10
 
 Offline Android finance tracker with EMI, loan, debt, expense, payment history, receipt attachment, local JSON backup/restore, and PDF reports.
 
