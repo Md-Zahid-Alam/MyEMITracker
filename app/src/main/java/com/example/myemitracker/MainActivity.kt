@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Backup
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Home
@@ -2114,8 +2115,22 @@ fun CompactTabButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    TextButton(onClick = onClick, modifier = modifier) {
-        Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    if (selected) {
+        Button(
+            onClick = onClick,
+            modifier = modifier,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+        ) { Text(label, maxLines = 1) }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+        ) { Text(label, maxLines = 1) }
     }
 }
 
@@ -2599,7 +2614,6 @@ fun EmiList(
                 item.payments.count {
                     it.paidDate != null
                 }
-
             val progress =
                 if (item.installments > 0) {
                     (
@@ -2629,60 +2643,11 @@ fun EmiList(
             ) {
 
                 Column(
-                    modifier =
-                        Modifier.padding(16.dp)
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-
-                    Text(
-                        item.name,
-                        style =
-                            MaterialTheme.typography
-                                .titleLarge,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    if (emiCompleted(item)) {
-                        completionDate(item.payments)?.let {
-                            Text("Completed ${dateText(it)}")
-                        }
-                    }
-
-                    Text(
-                        "${item.category} • " +
-                                "${money(item.monthlyPayment)} / month"
-                    )
-
-                    Text(
-                        "$paid/${item.installments} paid • " +
-                                "Remaining ${
-                                    money(
-                                        item.payments
-                                            .filter {
-                                                it.paidDate == null
-                                            }
-                                            .sumOf {
-                                                it.amount
-                                            }
-                                    )
-                                }"
-                    )
-
-                    Spacer(
-                        Modifier.height(8.dp)
-                    )
-
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier =
-                            Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(
-                        Modifier.height(8.dp)
-                    )
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         val actions = buildList<Pair<String, () -> Unit>> {
                             if (emiCompleted(item) && !item.archived) {
                                 add("Reopen" to {
@@ -2714,6 +2679,24 @@ fun EmiList(
                         }
                         PlanActionMenu(actions = actions, onDelete = { pendingDelete = item })
                     }
+                    if (emiCompleted(item)) completionDate(item.payments)?.let { Text("Completed ${dateText(it)}", style = MaterialTheme.typography.bodySmall) }
+                    Text("${item.category} • ${money(item.monthlyPayment)} / month")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("$paid of ${item.installments} paid")
+                        Text(
+                            "${money(item.payments.filter { it.paidDate == null }.sumOf { it.amount })} remaining",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        Text("${(progress * 100).toInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    item.payments.filter { it.paidDate == null }.minOfOrNull { it.dueDate }?.let {
+                        Text("Next payment: ${dateText(it)}", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }
@@ -2734,6 +2717,51 @@ fun EmiList(
     pendingAction?.let { request ->
         ConfirmationDialog(request) { pendingAction = null }
     }
+
+}
+
+@Composable
+fun MonthYearPickerDialog(
+    currentMonth: Long,
+    onAllMonths: () -> Unit,
+    onMonthSelected: (Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val initialYear = Calendar.getInstance().apply { timeInMillis = currentMonth }.get(Calendar.YEAR)
+    var year by remember(currentMonth) { mutableStateOf(initialYear) }
+    val months = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select period") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = onAllMonths, modifier = Modifier.fillMaxWidth()) { Text("All Months") }
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    IconButton(onClick = { year-- }) { Icon(Icons.Default.KeyboardArrowLeft, "Previous year") }
+                    Text(year.toString(), fontWeight = FontWeight.Bold)
+                    IconButton(onClick = { year++ }) { Icon(Icons.Default.KeyboardArrowRight, "Next year") }
+                }
+                months.chunked(3).forEachIndexed { rowIndex, rowMonths ->
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        rowMonths.forEachIndexed { columnIndex, label ->
+                            val monthIndex = rowIndex * 3 + columnIndex
+                            OutlinedButton(
+                                onClick = {
+                                    onMonthSelected(Calendar.getInstance().apply {
+                                        set(year, monthIndex, 1, 0, 0, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                    }.timeInMillis)
+                                },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp)
+                            ) { Text(label) }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 
@@ -2819,6 +2847,7 @@ fun LoanList(
                 item.payments.count {
                     it.paidDate != null
                 }
+            val progress = if (item.installments > 0) (paid.toFloat() / item.installments).coerceIn(0f, 1f) else 0f
 
             Card(
                 modifier = Modifier.fillMaxWidth().clickable {
@@ -2835,57 +2864,9 @@ fun LoanList(
                 }
             ) {
 
-                Column(
-                    modifier =
-                        Modifier.padding(16.dp)
-                ) {
-
-                    Text(
-                        item.name,
-                        style =
-                            MaterialTheme.typography
-                                .titleLarge,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        "${item.type} • ${item.lender}"
-                    )
-
-                    Text(
-                        "${money(item.monthlyPayment)} / month"
-                    )
-
-                    Text(
-                        "$paid/${item.installments} paid"
-                    )
-
-                    if (loanCompleted(item)) {
-                        completionDate(item.payments)?.let {
-                            Text("Completed ${dateText(it)}")
-                        }
-                    }
-
-                    Text(
-                        "Remaining ${
-                            money(
-                                item.payments
-                                    .filter {
-                                        it.paidDate == null
-                                    }
-                                    .sumOf {
-                                        it.amount
-                                    }
-                            )
-                        }"
-                    )
-
-                    Spacer(
-                        Modifier.height(8.dp)
-                    )
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         val actions = buildList<Pair<String, () -> Unit>> {
                             if (loanCompleted(item) && !item.archived) {
                                 add("Reopen" to {
@@ -2917,6 +2898,18 @@ fun LoanList(
                         }
                         PlanActionMenu(actions = actions, onDelete = { pendingDelete = item })
                     }
+                    if (loanCompleted(item)) completionDate(item.payments)?.let { Text("Completed ${dateText(it)}", style = MaterialTheme.typography.bodySmall) }
+                    Text("${item.type} • ${item.lender} • ${money(item.monthlyPayment)} / month")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("$paid of ${item.installments} paid")
+                        Text("${money(item.payments.filter { it.paidDate == null }.sumOf { it.amount })} remaining", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        Text("${(progress * 100).toInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    item.payments.filter { it.paidDate == null }.minOfOrNull { it.dueDate }?.let { Text("Next payment: ${dateText(it)}", style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
@@ -2937,6 +2930,7 @@ fun LoanList(
     pendingAction?.let { request ->
         ConfirmationDialog(request) { pendingAction = null }
     }
+
 }
 
 
@@ -3050,59 +3044,9 @@ fun DebtList(
                 }
             ) {
 
-                Column(
-                    modifier =
-                        Modifier.padding(16.dp)
-                ) {
-
-                    Text(
-                        item.name,
-                        style =
-                            MaterialTheme.typography
-                                .titleLarge,
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    Text(
-                        item.direction
-                    )
-
-                    Text(
-                        "Original ${money(item.originalAmount)}"
-                    )
-
-                    Text(
-                        "Paid ${money(paid)}"
-                    )
-
-                    Text(
-                        "Remaining ${money(remaining)}"
-                    )
-
-                    if (debtCompleted(item)) {
-                        completionDate(item.payments)?.let {
-                            Text("Completed ${dateText(it)}")
-                        }
-                    }
-
-                    Spacer(
-                        Modifier.height(8.dp)
-                    )
-
-                    LinearProgressIndicator(
-                        progress = {
-                            progress
-                        },
-                        modifier =
-                            Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(
-                        Modifier.height(8.dp)
-                    )
-
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(item.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         val actions = buildList<Pair<String, () -> Unit>> {
                             if (debtCompleted(item) && !item.archived) {
                                 add("Reopen" to {
@@ -3134,6 +3078,18 @@ fun DebtList(
                         }
                         PlanActionMenu(actions = actions, onDelete = { pendingDelete = item })
                     }
+                    if (debtCompleted(item)) completionDate(item.payments)?.let { Text("Completed ${dateText(it)}", style = MaterialTheme.typography.bodySmall) }
+                    Text("${item.direction} • Original ${money(item.originalAmount)}")
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Paid ${money(paid)}")
+                        Text("${money(remaining)} remaining", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        LinearProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f))
+                        Spacer(Modifier.width(8.dp))
+                        Text("${(progress * 100).toInt()}%", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    }
+                    item.dueDate?.let { Text("Due: ${dateText(it)}", style = MaterialTheme.typography.bodySmall) }
                 }
             }
         }
@@ -3194,6 +3150,7 @@ fun ExpenseList(
     viewModel: FinanceViewModel,
     onOpen: (String) -> Unit
 ) {
+    val context = LocalContext.current
     var viewMode by remember { mutableStateOf("DAILY") }
     var pendingDelete by remember { mutableStateOf<Expense?>(null) }
     var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
@@ -3216,6 +3173,8 @@ fun ExpenseList(
     var categorySummaryExpanded by remember { mutableStateOf(false) }
     var categoryFilter by remember { mutableStateOf("All") }
     var expandedPeriods by remember { mutableStateOf(emptySet<String>()) }
+    var monthPickerVisible by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf<Long?>(null) }
 
     val sorted = when (sortMode) {
         "Oldest first" -> viewModel.data.expenses.sortedBy { it.date }
@@ -3224,7 +3183,14 @@ fun ExpenseList(
         else -> viewModel.data.expenses.sortedByDescending { it.date }
     }
     val availableCategories = listOf("All") + sorted.map { it.category }.distinct().sorted()
-    val selectedPeriodExpenses = if (allMonths) {
+    val selectedPeriodExpenses = if (selectedDate != null) {
+        val target = Calendar.getInstance().apply { timeInMillis = selectedDate!! }
+        sorted.filter { expense ->
+            val value = Calendar.getInstance().apply { timeInMillis = expense.date }
+            target.get(Calendar.YEAR) == value.get(Calendar.YEAR) &&
+                target.get(Calendar.DAY_OF_YEAR) == value.get(Calendar.DAY_OF_YEAR)
+        }
+    } else if (allMonths) {
         sorted
     } else {
         val selectedCalendar = Calendar.getInstance().apply { timeInMillis = selectedMonth }
@@ -3311,22 +3277,51 @@ fun ExpenseList(
                     onClick = {
                         selectedMonth = addMonths(selectedMonth, -1)
                         allMonths = false
+                        selectedDate = null
                         expandedPeriods = emptySet()
                     }
                 ) { Icon(Icons.Default.KeyboardArrowLeft, "Previous month") }
 
                 TextButton(
-                    onClick = { allMonths = !allMonths },
+                    onClick = { monthPickerVisible = true },
                     modifier = Modifier.weight(1f)
-                ) { Text(if (allMonths) "All Months" else expenseMonthKey(selectedMonth), fontWeight = FontWeight.Bold) }
+                ) { Text(selectedDate?.let { expenseDayKey(it) } ?: if (allMonths) "All Months" else expenseMonthKey(selectedMonth), fontWeight = FontWeight.Bold) }
 
                 IconButton(
                     onClick = {
                         selectedMonth = addMonths(selectedMonth, 1)
                         allMonths = false
+                        selectedDate = null
                         expandedPeriods = emptySet()
                     }
                 ) { Icon(Icons.Default.KeyboardArrowRight, "Next month") }
+
+                IconButton(onClick = {
+                    val initial = Calendar.getInstance().apply { timeInMillis = selectedDate ?: selectedMonth }
+                    DatePickerDialog(
+                        context,
+                        { _, year, month, day ->
+                            selectedDate = Calendar.getInstance().apply {
+                                set(year, month, day, 0, 0, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }.timeInMillis
+                            allMonths = false
+                            expandedPeriods = emptySet()
+                        },
+                        initial.get(Calendar.YEAR),
+                        initial.get(Calendar.MONTH),
+                        initial.get(Calendar.DAY_OF_MONTH)
+                    ).show()
+                }) { Icon(Icons.Default.DateRange, "Select specific date") }
+            }
+        }
+
+        if (selectedDate != null) {
+            item {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Showing one day", modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+                    TextButton(onClick = { selectedDate = null }) { Text("Clear date") }
+                }
             }
         }
 
@@ -3362,7 +3357,7 @@ fun ExpenseList(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(if (allMonths) "Total spending" else "Spent this month")
+                    Text(if (selectedDate != null) "Spent this day" else if (allMonths) "Total spending" else "Spent this month")
                     Text(
                         money(selectedPeriodExpenses.sumOf { it.amount }),
                         style = MaterialTheme.typography.headlineSmall,
@@ -3484,6 +3479,26 @@ fun ExpenseList(
 
     pendingAction?.let { request ->
         ConfirmationDialog(request) { pendingAction = null }
+    }
+
+    if (monthPickerVisible) {
+        MonthYearPickerDialog(
+            currentMonth = selectedMonth,
+            onAllMonths = {
+                allMonths = true
+                selectedDate = null
+                expandedPeriods = emptySet()
+                monthPickerVisible = false
+            },
+            onMonthSelected = { value ->
+                selectedMonth = value
+                allMonths = false
+                selectedDate = null
+                expandedPeriods = emptySet()
+                monthPickerVisible = false
+            },
+            onDismiss = { monthPickerVisible = false }
+        )
     }
 }
 
