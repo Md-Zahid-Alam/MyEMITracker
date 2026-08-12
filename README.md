@@ -1,17 +1,15 @@
-# My Finance Tracker — Version 4.7
+# My Finance Tracker — Version 4.8
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 4.7 updates
+## Version 4.8 updates
 
-- Compact pill tabs with a clear light-teal selected state
-- Payment cards match the approved compact preview
-- Three-dot actions moved into the card’s top-right corner
-- Paid count, remaining amount, progress percentage, and next date use compact rows
-- Direct month and year selection by tapping the expense period
-- All Months remains available in the period selector
-- Calendar action jumps directly to one specific expense date
-- Existing themes, confirmations, adaptive icon, and permanent signing retained
+- “Powered by Md. Zahid Alam” displayed on the login screen
+- About My Finance Tracker page added to Settings
+- About page identifies Md. Zahid Alam as creator and owner
+- Ownership and copyright information displayed with app version
+- PDF and Excel reports include ownership footers
+- Package name and backup format remain unchanged
 
 ## Private local data
 
@@ -24,4 +22,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The signed APK is uploaded as the `My-Finance-Tracker-V4.7-signed` Actions artifact. Keep the permanent signing key private and backed up.
+The signed APK is uploaded as the `My-Finance-Tracker-V4.8-signed` Actions artifact. Keep the permanent signing key private and backed up.
