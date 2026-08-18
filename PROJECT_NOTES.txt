@@ -1,8 +1,8 @@
-My Finance Tracker - Version 4.9
+My Finance Tracker - Version 5.0
 
 Package: com.mdzahidalam.myfinancetracker
-Version code: 13
+Version code: 14
 
-Offline Android finance tracker with EMI, loan, debt, expense, payment history, receipt attachment, local JSON backup/restore, and PDF reports.
+Offline Android finance tracker with encrypted records/backups, financing details, supporting documents, payment methods, separated debt directions, PDF receipts, owed-to-me payment requests, expenses, and reports.
 
 GitHub builds must use the permanent signing secrets described in README.md. Never commit a .p12, .jks, or keystore file.
