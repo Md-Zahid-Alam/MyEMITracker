@@ -2975,14 +2975,13 @@ fun EmiList(
     var pendingDelete by remember { mutableStateOf<EmiItem?>(null) }
     var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
-    var directionFilter by remember { mutableStateOf("I Owe") }
     val filteredItems = viewModel.data.emis.filter { item ->
         val statusMatches = when (statusFilter) {
             "Archived" -> item.archived
             "Completed" -> !item.archived && emiCompleted(item)
             else -> !item.archived && !emiCompleted(item)
         }
-        statusMatches && item.direction == directionFilter && (
+        statusMatches && (
             search.isBlank() ||
             listOf(item.name, item.category, item.seller).any {
                 it.contains(search.trim(), ignoreCase = true)
@@ -3378,13 +3377,14 @@ fun DebtList(
     var pendingDelete by remember { mutableStateOf<Debt?>(null) }
     var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
+    var directionFilter by remember { mutableStateOf("I Owe") }
     val filteredItems = viewModel.data.debts.filter { item ->
         val statusMatches = when (statusFilter) {
             "Archived" -> item.archived
             "Completed" -> !item.archived && debtCompleted(item)
             else -> !item.archived && !debtCompleted(item)
         }
-        statusMatches && (
+        statusMatches && item.direction == directionFilter && (
             search.isBlank() ||
             listOf(item.name, item.direction, item.notes).any {
                 it.contains(search.trim(), ignoreCase = true)
@@ -4497,7 +4497,7 @@ fun EmiForm(
         receivedMethod != (existing?.receivedMethod ?: "Direct purchase financing") ||
         agreementReference != (existing?.agreementReference ?: "") ||
         financingNotes != (existing?.financingNotes ?: "") ||
-        attachments != (existing?.attachments ?: emptyList()) ||
+        attachments != (existing?.attachments ?: emptyList<Attachment>()) ||
         price != (existing?.price?.toString() ?: "") ||
         downPayment != (existing?.downPayment?.toString() ?: "0") ||
         interestRate != (existing?.interestRate?.toString() ?: "0") ||
@@ -5070,7 +5070,7 @@ fun LoanForm(
         receivedMethod != (existing?.receivedMethod ?: "Bank transfer") ||
         agreementReference != (existing?.agreementReference ?: "") ||
         financingNotes != (existing?.financingNotes ?: "") ||
-        attachments != (existing?.attachments ?: emptyList()) ||
+        attachments != (existing?.attachments ?: emptyList<Attachment>()) ||
         principal != (existing?.principal?.toString() ?: "") ||
         rate != (existing?.interestRate?.toString() ?: "0") ||
         interest != (existing?.interestAmount?.toString() ?: "0") ||
@@ -5553,7 +5553,7 @@ fun DebtForm(
         reason != (existing?.reason ?: "") ||
         receivedOrGivenMethod != (existing?.receivedOrGivenMethod ?: "Cash") ||
         debtReference != (existing?.referenceNumber ?: "") ||
-        attachments != (existing?.attachments ?: emptyList()) ||
+        attachments != (existing?.attachments ?: emptyList<Attachment>()) ||
         payment.isNotBlank() ||
         previousPayment.isNotBlank()
     )
@@ -6080,7 +6080,7 @@ fun ExpenseForm(
         amount != (existing?.amount?.toString() ?: "") ||
         date != initialDate ||
         notes != (existing?.notes ?: "") ||
-        attachments != (existing?.attachments ?: emptyList())
+        attachments != (existing?.attachments ?: emptyList<Attachment>())
 
     FormColumn(
         title = if (existing == null) "Add Expense" else "Edit Expense",
