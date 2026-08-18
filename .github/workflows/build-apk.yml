@@ -48,6 +48,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v6
         with:
-          name: My-Finance-Tracker-V4.8-signed
+          name: My-Finance-Tracker-V4.9-owner-package
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
