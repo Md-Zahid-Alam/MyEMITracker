@@ -1936,6 +1936,7 @@ class FinanceViewModel(
     fun markDebtPaid(
         id: String,
         amount: Double,
+        paidDate: Long = System.currentTimeMillis(),
         method: String = "Cash",
         channel: String = "",
         reference: String = "",
@@ -1966,9 +1967,9 @@ class FinanceViewModel(
         val payment =
             Payment(
                 number = nextNumber,
-                dueDate = System.currentTimeMillis(),
+                dueDate = paidDate,
                 amount = amount,
-                paidDate = System.currentTimeMillis(),
+                paidDate = paidDate,
                 notes = notes,
                 paymentMethod = method,
                 paymentChannel = channel,
@@ -2065,7 +2066,7 @@ fun FinanceApp(
     }
 
     var paymentSection by remember {
-        mutableStateOf("EMI")
+        mutableStateOf("")
     }
     var showBackupPasswordDialog by remember { mutableStateOf(false) }
     var backupPassword by remember { mutableStateOf("") }
@@ -2079,8 +2080,18 @@ fun FinanceApp(
 
     BackHandler(enabled = selectedType.isNotBlank() || tab != 0) {
         if (selectedType.isNotBlank()) {
-            selectedType = ""
-            selectedId = ""
+            selectedType = when (selectedType) {
+                "emi_history", "emi_documents", "emi_financing", "emi_payment" -> "emi_detail"
+                "loan_history", "loan_documents", "loan_financing", "loan_payment" -> "loan_detail"
+                "debt_history", "debt_documents", "debt_financing", "debt_payment" -> "debt_detail"
+                "emi" -> if (selectedId.isNotBlank()) "emi_detail" else ""
+                "loan" -> if (selectedId.isNotBlank()) "loan_detail" else ""
+                "debt" -> if (selectedId.isNotBlank()) "debt_detail" else ""
+                else -> ""
+            }
+            if (selectedType.isBlank()) selectedId = ""
+        } else if (tab == 1 && paymentSection.isNotBlank()) {
+            paymentSection = ""
         } else {
             tab = 0
         }
@@ -2163,6 +2174,7 @@ fun FinanceApp(
 
                         onClick = {
                             tab = index
+                            if (index == 1) paymentSection = ""
                             selectedType = ""
                             selectedId = ""
                         },
@@ -2195,7 +2207,7 @@ fun FinanceApp(
 
         floatingActionButton = {
 
-            if (selectedType.isBlank() && (tab == 1 || tab == 2)) {
+            if (selectedType.isBlank() && (tab == 2 || (tab == 1 && paymentSection.isNotBlank()))) {
 
                 FloatingActionButton(
 
@@ -2231,6 +2243,53 @@ fun FinanceApp(
 
             when {
 
+                selectedType.endsWith("_detail") -> {
+                    val kind = selectedType.removeSuffix("_detail")
+                    PaymentPlanDetail(
+                        viewModel = viewModel,
+                        kind = kind,
+                        id = selectedId,
+                        onBack = { selectedType = ""; selectedId = "" },
+                        onOpen = { page -> selectedType = if (page == "edit") kind else "${kind}_$page" }
+                    )
+                }
+
+                selectedType.endsWith("_history") -> {
+                    PaymentPlanHistory(
+                        viewModel = viewModel,
+                        kind = selectedType.removeSuffix("_history"),
+                        id = selectedId,
+                        onBack = { selectedType = selectedType.removeSuffix("_history") + "_detail" }
+                    )
+                }
+
+                selectedType.endsWith("_documents") -> {
+                    PaymentPlanDocuments(
+                        viewModel = viewModel,
+                        kind = selectedType.removeSuffix("_documents"),
+                        id = selectedId,
+                        onBack = { selectedType = selectedType.removeSuffix("_documents") + "_detail" }
+                    )
+                }
+
+                selectedType.endsWith("_financing") -> {
+                    PaymentPlanFinancing(
+                        viewModel = viewModel,
+                        kind = selectedType.removeSuffix("_financing"),
+                        id = selectedId,
+                        onBack = { selectedType = selectedType.removeSuffix("_financing") + "_detail" }
+                    )
+                }
+
+                selectedType.endsWith("_payment") -> {
+                    PaymentPlanPayment(
+                        viewModel = viewModel,
+                        kind = selectedType.removeSuffix("_payment"),
+                        id = selectedId,
+                        onBack = { selectedType = selectedType.removeSuffix("_payment") + "_detail" }
+                    )
+                }
+
                 selectedType == "emi" -> {
 
                     EmiForm(
@@ -2239,8 +2298,7 @@ fun FinanceApp(
                             it.id == selectedId
                         },
                         done = {
-                            selectedType = ""
-                            selectedId = ""
+                            if (selectedId.isBlank()) selectedType = "" else selectedType = "emi_detail"
                         }
                     )
                 }
@@ -2253,8 +2311,7 @@ fun FinanceApp(
                             it.id == selectedId
                         },
                         done = {
-                            selectedType = ""
-                            selectedId = ""
+                            if (selectedId.isBlank()) selectedType = "" else selectedType = "loan_detail"
                         }
                     )
                 }
@@ -2267,8 +2324,7 @@ fun FinanceApp(
                             it.id == selectedId
                         },
                         done = {
-                            selectedType = ""
-                            selectedId = ""
+                            if (selectedId.isBlank()) selectedType = "" else selectedType = "debt_detail"
                         }
                     )
                 }
@@ -2431,6 +2487,10 @@ fun PaymentsHub(
     onSectionChange: (String) -> Unit,
     onOpen: (String, String) -> Unit
 ) {
+    if (section.isBlank()) {
+        PaymentsLanding(viewModel = viewModel, onOpenSection = onSectionChange)
+        return
+    }
     var search by remember { mutableStateOf("") }
     var sortMode by remember { mutableStateOf("Newest first") }
     var searchVisible by remember { mutableStateOf(false) }
@@ -2441,8 +2501,15 @@ fun PaymentsHub(
             modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 8.dp, end = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            IconButton(onClick = { onSectionChange("") }) {
+                Icon(Icons.Default.ArrowBack, "Back to Payments")
+            }
             Text(
-                "Payments",
+                when (section) {
+                    "EMI" -> "EMI Plans"
+                    "Loans" -> "Loans"
+                    else -> "Debts"
+                },
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f)
@@ -2479,28 +2546,275 @@ fun PaymentsHub(
             )
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            listOf("EMI", "Loans", "Debts").forEach { option ->
-                CompactTabButton(
-                    label = option,
-                    selected = section == option,
-                    onClick = { onSectionChange(option) },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-
         Box(modifier = Modifier.weight(1f)) {
             when (section) {
-                "EMI" -> EmiList(viewModel, search, sortMode) { onOpen("emi", it) }
-                "Loans" -> LoanList(viewModel, search, sortMode) { onOpen("loan", it) }
-                else -> DebtList(viewModel, search, sortMode) { onOpen("debt", it) }
+                "EMI" -> EmiList(viewModel, search, sortMode) { onOpen("emi_detail", it) }
+                "Loans" -> LoanList(viewModel, search, sortMode) { onOpen("loan_detail", it) }
+                else -> DebtList(viewModel, search, sortMode) { onOpen("debt_detail", it) }
             }
+        }
+    }
+}
+
+@Composable
+fun PaymentsLanding(viewModel: FinanceViewModel, onOpenSection: (String) -> Unit) {
+    val activeEmis = viewModel.data.emis.filter { !it.archived && !emiCompleted(it) }
+    val activeLoans = viewModel.data.loans.filter { !it.archived && !loanCompleted(it) }
+    val activeDebts = viewModel.data.debts.filter { !it.archived && !debtCompleted(it) }
+    val debtToPay = activeDebts.filter { it.direction == "I Owe" }.sumOf { debtRemainingAmount(it) }
+    val moneyToReceive = activeDebts.filter { it.direction == "Owed to Me" }.sumOf { debtRemainingAmount(it) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { Text("Payments", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+        item { Text("Choose the type of financial record you want to manage.") }
+        item {
+            PaymentSectionCard(
+                title = "EMI Plans",
+                summary = "${activeEmis.size} active • ${money(activeEmis.sumOf { emi -> emi.payments.filter { it.paidDate == null }.sumOf { it.amount } })} left",
+                onClick = { onOpenSection("EMI") }
+            )
+        }
+        item {
+            PaymentSectionCard(
+                title = "Loans",
+                summary = "${activeLoans.size} active • ${money(activeLoans.sumOf { loan -> loan.payments.filter { it.paidDate == null }.sumOf { it.amount } })} left",
+                onClick = { onOpenSection("Loans") }
+            )
+        }
+        item {
+            PaymentSectionCard(
+                title = "Debts",
+                summary = "Pay ${money(debtToPay)} • Receive ${money(moneyToReceive)}",
+                onClick = { onOpenSection("Debts") }
+            )
+        }
+    }
+}
+
+@Composable
+fun PaymentPlanDetail(
+    viewModel: FinanceViewModel,
+    kind: String,
+    id: String,
+    onBack: () -> Unit,
+    onOpen: (String) -> Unit
+) {
+    var showRequestDialog by remember { mutableStateOf(false) }
+    val emi = viewModel.data.emis.find { it.id == id }
+    val loan = viewModel.data.loans.find { it.id == id }
+    val debt = viewModel.data.debts.find { it.id == id }
+    val name = emi?.name ?: loan?.name ?: debt?.name ?: "Plan"
+    val payments = emi?.payments ?: loan?.payments ?: debt?.payments ?: emptyList()
+    val total = emi?.totalPayable ?: loan?.totalPayable ?: debt?.originalAmount ?: 0.0
+    val paid = payments.filter { it.paidDate != null }.sumOf { it.amount }
+    val archived = emi?.archived ?: loan?.archived ?: debt?.archived ?: false
+    val completed = paid + 0.005 >= total
+    val documents = emi?.attachments ?: loan?.attachments ?: debt?.attachments ?: emptyList()
+    val typeName = when (kind) { "emi" -> "EMI"; "loan" -> "Loan"; else -> "Debt" }
+
+    FormColumn(title = "$typeName Details", onBack = onBack, readOnly = true) {
+        Text(name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(when { archived -> "Archived"; completed -> "Completed"; else -> "Active" }, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        Card(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Total: ${money(total)}")
+                Text("Paid: ${money(paid)}")
+                Text("Remaining: ${money(max(0.0, total - paid))}", fontWeight = FontWeight.Bold)
+                if (debt != null) Text(if (debt.direction == "I Owe") "You owe ${debt.name}" else "${debt.name} owes you")
+            }
+        }
+        if (!archived && !completed) {
+            Button(onClick = { onOpen("payment") }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (debt?.direction == "Owed to Me") "Record Received Amount" else "Record Payment")
+            }
+            OutlinedButton(onClick = { onOpen("edit") }, modifier = Modifier.fillMaxWidth()) { Text("Edit Plan Information") }
+            if (debt?.direction == "Owed to Me") {
+                OutlinedButton(onClick = { showRequestDialog = true }, modifier = Modifier.fillMaxWidth()) { Text("Create Payment Request") }
+            }
+        } else {
+            Text("This record is view-only. Reopen or restore it from the plan menu before making changes.")
+        }
+        DetailNavigationButton("Payment History", "${payments.count { it.paidDate != null }} recorded") { onOpen("history") }
+        DetailNavigationButton("Documents", if (documents.isEmpty()) "No documents" else "${documents.size} attached") { onOpen("documents") }
+        DetailNavigationButton("Financing Information", "Source, method, reference and notes") { onOpen("financing") }
+        if (debt != null && debt.paymentRequests.isNotEmpty()) {
+            Text("Payment Requests", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            debt.paymentRequests.sortedByDescending { it.createdDate }.forEach { PaymentRequestCard(debt, it, viewModel.data.receiptProfile) }
+        }
+    }
+    if (showRequestDialog && debt != null) {
+        PaymentRequestDialog(debt, onSave = { viewModel.addPaymentRequest(debt.id, it); showRequestDialog = false }, onDismiss = { showRequestDialog = false })
+    }
+}
+
+@Composable
+private fun DetailNavigationButton(title: String, subtitle: String, onClick: () -> Unit) {
+    OutlinedButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(title, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+fun PaymentPlanHistory(viewModel: FinanceViewModel, kind: String, id: String, onBack: () -> Unit) {
+    val emi = viewModel.data.emis.find { it.id == id }
+    val loan = viewModel.data.loans.find { it.id == id }
+    val debt = viewModel.data.debts.find { it.id == id }
+    val payments = emi?.payments ?: loan?.payments ?: debt?.payments ?: emptyList()
+    val name = emi?.name ?: loan?.name ?: debt?.name ?: "Payment"
+    val total = emi?.totalPayable ?: loan?.totalPayable ?: debt?.originalAmount ?: 0.0
+    FormColumn(title = "Payment History", onBack = onBack, readOnly = false) {
+        PaymentHistory(
+            payments = payments,
+            onUpdate = when (kind) {
+                "emi" -> ({ payment -> viewModel.updateEmiPayment(id, payment) })
+                "loan" -> ({ payment -> viewModel.updateLoanPayment(id, payment) })
+                else -> ({ payment -> viewModel.updateDebtPayment(id, payment) })
+            },
+            planName = name,
+            direction = debt?.direction ?: "I Owe",
+            planTotal = total,
+            profile = viewModel.data.receiptProfile
+        )
+    }
+}
+
+@Composable
+fun PaymentPlanDocuments(viewModel: FinanceViewModel, kind: String, id: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val documents = when (kind) {
+        "emi" -> viewModel.data.emis.find { it.id == id }?.attachments
+        "loan" -> viewModel.data.loans.find { it.id == id }?.attachments
+        else -> viewModel.data.debts.find { it.id == id }?.attachments
+    } ?: emptyList()
+    FormColumn(title = "Documents", onBack = onBack, readOnly = true) {
+        if (documents.isEmpty()) Text("No supporting documents are attached.")
+        documents.forEach { attachment ->
+            OutlinedButton(onClick = { runCatching { openAttachment(context, attachment) } }, modifier = Modifier.fillMaxWidth()) {
+                Text("Open ${attachment.name}")
+            }
+        }
+    }
+}
+
+@Composable
+fun PaymentPlanFinancing(viewModel: FinanceViewModel, kind: String, id: String, onBack: () -> Unit) {
+    val emi = viewModel.data.emis.find { it.id == id }
+    val loan = viewModel.data.loans.find { it.id == id }
+    val debt = viewModel.data.debts.find { it.id == id }
+    FormColumn(title = "Financing Information", onBack = onBack, readOnly = true) {
+        if (emi != null) {
+            InfoRow("Source", emi.financingSource)
+            InfoRow("How received", emi.receivedMethod)
+            InfoRow("Seller / provider", emi.seller)
+            InfoRow("Agreement reference", emi.agreementReference)
+            InfoRow("Notes", emi.financingNotes)
+        } else if (loan != null) {
+            InfoRow("Source", loan.financingSource)
+            InfoRow("How received", loan.receivedMethod)
+            InfoRow("Lender", loan.lender)
+            InfoRow("Agreement reference", loan.agreementReference)
+            InfoRow("Notes", loan.financingNotes)
+        } else if (debt != null) {
+            InfoRow("Direction", debt.direction)
+            InfoRow("Reason", debt.reason)
+            InfoRow("How received / given", debt.receivedOrGivenMethod)
+            InfoRow("Agreement reference", debt.referenceNumber)
+            InfoRow("Notes", debt.notes)
+        } else Text("Record not found.")
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+            Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.secondary)
+            Text(value.ifBlank { "Not recorded" }, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun PaymentPlanPayment(viewModel: FinanceViewModel, kind: String, id: String, onBack: () -> Unit) {
+    val emi = viewModel.data.emis.find { it.id == id }
+    val loan = viewModel.data.loans.find { it.id == id }
+    val debt = viewModel.data.debts.find { it.id == id }
+    val pending = (emi?.payments ?: loan?.payments ?: emptyList()).firstOrNull { it.paidDate == null }
+    FormColumn(title = if (debt?.direction == "Owed to Me") "Receive Payment" else "Record Payment", onBack = onBack, readOnly = false) {
+        if (debt != null) {
+            DebtPaymentEntry(viewModel, debt, onSaved = onBack)
+        } else if (pending == null) {
+            Text("There is no pending payment for this plan.")
+        } else {
+            Text("Next installment: ${money(pending.amount)}", fontWeight = FontWeight.Bold)
+            Text("Due ${dateText(pending.dueDate)}")
+            PaymentHistory(
+                payments = listOf(pending),
+                onUpdate = if (kind == "emi") ({ p -> viewModel.updateEmiPayment(id, p); onBack() }) else ({ p -> viewModel.updateLoanPayment(id, p); onBack() }),
+                planName = emi?.name ?: loan?.name ?: "Payment",
+                planTotal = emi?.totalPayable ?: loan?.totalPayable ?: 0.0,
+                profile = viewModel.data.receiptProfile
+            )
+        }
+    }
+}
+
+@Composable
+private fun DebtPaymentEntry(viewModel: FinanceViewModel, debt: Debt, onSaved: () -> Unit) {
+    var amount by remember { mutableStateOf("") }
+    var paidDate by remember { mutableStateOf(expenseDateText(System.currentTimeMillis())) }
+    var method by remember { mutableStateOf("Cash") }
+    var channel by remember { mutableStateOf("") }
+    var reference by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var attachments by remember { mutableStateOf(emptyList<Attachment>()) }
+    var error by remember { mutableStateOf("") }
+    val remaining = debtRemainingAmount(debt)
+
+    Text("${debt.name} • Remaining ${money(remaining)}", fontWeight = FontWeight.Bold)
+    Field(if (debt.direction == "Owed to Me") "Received amount" else "Payment amount", amount) { amount = it; error = "" }
+    DatePickerField("Payment date", paidDate) { paidDate = it; error = "" }
+    ChoiceDropdown("Payment method", method, listOf("Cash", "Bank transfer", "Mobile banking", "Salary deduction", "Card", "Cheque", "Other")) { method = it }
+    if (method == "Mobile banking") ChoiceDropdown("Provider", channel.ifBlank { "bKash" }, listOf("bKash", "Nagad", "Rocket", "Other")) { channel = it }
+    if (method == "Bank transfer") Field("Bank name", channel) { channel = it }
+    Field("Transaction / reference ID", reference) { reference = it }
+    Field("Payment notes", notes) { notes = it }
+    AttachmentSection(attachments, maxFiles = 3) { attachments = it }
+    if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+    Button(onClick = {
+        val value = amount.toDoubleOrNull() ?: 0.0
+        val date = parseExpenseDate(paidDate)
+        error = when {
+            value <= 0.0 -> "Enter a valid amount greater than zero."
+            value > 999_999_999.99 -> "Amount is too large."
+            value > remaining + 0.005 -> "Amount cannot exceed the remaining ${money(remaining)}."
+            date == null -> "Select a valid payment date."
+            date > System.currentTimeMillis() -> "Payment date cannot be in the future."
+            (method == "Mobile banking" || method == "Bank transfer") && channel.isBlank() -> "Enter the payment provider or bank."
+            else -> ""
+        }
+        if (error.isBlank() && date != null) {
+            viewModel.markDebtPaid(debt.id, value, paidDate = date, method = method, channel = channel, reference = reference.trim(), counterparty = debt.name, notes = notes.trim(), attachments = attachments)
+            onSaved()
+        }
+    }, modifier = Modifier.fillMaxWidth()) { Text(if (debt.direction == "Owed to Me") "Save Received Amount" else "Save Payment") }
+}
+
+@Composable
+fun PaymentSectionCard(title: String, summary: String, onClick: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(summary, color = MaterialTheme.colorScheme.secondary)
+            }
+            Icon(Icons.Default.KeyboardArrowRight, contentDescription = "Open $title")
         }
     }
 }
@@ -3624,6 +3938,7 @@ fun ExpenseList(
     var expandedPeriods by remember { mutableStateOf(emptySet<String>()) }
     var monthPickerVisible by remember { mutableStateOf(false) }
     var selectedDate by remember { mutableStateOf<Long?>(null) }
+    var viewingDocuments by remember { mutableStateOf<Expense?>(null) }
 
     val sorted = when (sortMode) {
         "Oldest first" -> viewModel.data.expenses.sortedBy { it.date }
@@ -3895,6 +4210,11 @@ fun ExpenseList(
                             }
 
                             Row {
+                                if (expense.attachments.isNotEmpty()) {
+                                    TextButton(onClick = { viewingDocuments = expense }) {
+                                        Text(if (expense.attachments.size == 1) "View Document" else "View Documents")
+                                    }
+                                }
                                 TextButton(onClick = {
                                     pendingAction = ConfirmationRequest(
                                         title = "Edit Expense?",
@@ -3931,6 +4251,23 @@ fun ExpenseList(
 
     pendingAction?.let { request ->
         ConfirmationDialog(request) { pendingAction = null }
+    }
+
+    viewingDocuments?.let { expense ->
+        AlertDialog(
+            onDismissRequest = { viewingDocuments = null },
+            title = { Text("${expense.title} Documents") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    expense.attachments.forEach { attachment ->
+                        OutlinedButton(onClick = { runCatching { openAttachment(context, attachment) } }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Open ${attachment.name}")
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { viewingDocuments = null }) { Text("Close") } }
+        )
     }
 
     if (monthPickerVisible) {
@@ -4319,8 +4656,14 @@ fun PaymentEditDialog(
 
                     if (parsedDueDate == null || (payment.paidDate != null && parsedPaidDate == null)) {
                         error = "Enter valid dates as DD-MM-YYYY."
+                    } else if (parsedPaidDate != null && parsedPaidDate > System.currentTimeMillis()) {
+                        error = "Paid date cannot be in the future."
                     } else if (parsedPaidDate != null && paymentMethod == "Not recorded") {
                         error = "Select how this payment was made."
+                    } else if (parsedPaidDate != null && (paymentMethod == "Mobile banking" || paymentMethod == "Bank transfer") && paymentChannel.isBlank()) {
+                        error = "Enter the mobile banking provider or bank name."
+                    } else if (notes.length > 500 || referenceNumber.length > 100 || counterparty.length > 100) {
+                        error = "Notes must be 500 characters or less; reference and party names must be 100 or less."
                     } else {
                         onSave(
                             payment.copy(
@@ -4690,15 +5033,24 @@ fun EmiForm(
                     itemName.isEmpty() ->
                         "Enter item name."
 
-                    purchasePrice <= 0 ->
+                    itemName.length > 100 ->
+                        "Item name must be 100 characters or less."
+
+                    purchasePrice <= 0 || purchasePrice > 999_999_999.99 ->
                         "Enter a valid price."
+
+                    rate !in 0.0..100.0 || enteredInterest < 0 ->
+                        "Interest rate must be 0-100 and interest amount cannot be negative."
+
+                    rate > 0 && enteredInterest > 0 ->
+                        "Use either interest rate or fixed interest amount, not both."
 
                     down < 0 ||
                             down >= purchasePrice ->
                         "Check down payment."
 
-                    count <= 0 ->
-                        "Enter installments."
+                    count !in 1..600 ->
+                        "Installments must be between 1 and 600."
 
                     previous !in 0..count ->
                         "Previous paid must be 0 to total installments."
@@ -4861,7 +5213,7 @@ fun EmiForm(
         }
         }
 
-        if (existing != null) {
+        if (false && existing != null) {
 
             Text(
                 "Payment History",
@@ -5052,7 +5404,7 @@ fun LoanForm(
         if (repaymentMode == "FLEXIBLE" && flexibleMonthly > 0) {
             buildList {
                 var remaining = total
-                while (remaining > 0.0001) {
+                while (remaining > 0.0001 && size < 600) {
                     val amount = minOf(flexibleMonthly, remaining)
                     add(amount)
                     remaining -= amount
@@ -5275,13 +5627,22 @@ fun LoanForm(
                     name.isBlank() ->
                         "Enter loan name."
 
-                    principalAmount <= 0 ->
+                    name.trim().length > 100 ->
+                        "Loan name must be 100 characters or less."
+
+                    principalAmount <= 0 || principalAmount > 999_999_999.99 ->
                         "Enter principal."
 
-                    repaymentMode == "EQUAL" && count <= 0 ->
-                        "Enter installments."
+                    interestRate !in 0.0..100.0 || enteredInterest < 0 ->
+                        "Interest rate must be 0-100 and interest amount cannot be negative."
 
-                    repaymentMode == "FLEXIBLE" && flexibleMonthly <= 0 ->
+                    interestRate > 0 && enteredInterest > 0 ->
+                        "Use either interest rate or fixed interest amount, not both."
+
+                    repaymentMode == "EQUAL" && count !in 1..600 ->
+                        "Installments must be between 1 and 600."
+
+                    repaymentMode == "FLEXIBLE" && (flexibleMonthly <= 0 || scheduledAmounts.size >= 600) ->
                         "Enter a valid planned monthly payment."
 
                     previousCount !in 0..scheduleCount ->
@@ -5442,7 +5803,7 @@ fun LoanForm(
         }
         }
 
-        if (existing != null) {
+        if (false && existing != null) {
 
             Text(
                 "Repayment History",
@@ -5739,7 +6100,7 @@ fun DebtForm(
                 ) { Text("Update Debt Details") }
             }
 
-            if (!viewOnly) {
+            if (false && !viewOnly) {
             Field(
                 if (direction == "I Owe") "New payment amount" else "New received amount",
                 payment
@@ -5836,7 +6197,7 @@ fun DebtForm(
                 }
             }
 
-            Text(
+            if (false) Text(
                 "Payment History",
                 style =
                     MaterialTheme.typography
@@ -5845,7 +6206,7 @@ fun DebtForm(
                     FontWeight.Bold
             )
 
-            PaymentHistory(
+            if (false) PaymentHistory(
                 payments = existing.payments,
                 onUpdate = if (viewOnly) null else {
                     { payment -> viewModel.updateDebtPayment(existing.id, payment) }
@@ -5877,8 +6238,8 @@ fun DebtForm(
                     val previousAmount = previousPayment.toDoubleOrNull() ?: 0.0
 
                     if (
-                        name.isBlank() ||
-                        originalAmount <= 0 ||
+                        name.isBlank() || name.trim().length > 100 ||
+                        originalAmount <= 0 || originalAmount > 999_999_999.99 ||
                         previousAmount < 0 ||
                         previousAmount > originalAmount
                     ) {
@@ -5956,7 +6317,7 @@ private fun paymentRequestText(debt: Debt, request: PaymentRequest, profile: Rec
     if (profile.phone.isNotBlank()) appendLine("Phone: ${profile.phone}")
     if (profile.email.isNotBlank()) appendLine("Email: ${profile.email}")
     if (profile.address.isNotBlank()) appendLine("Address: ${profile.address}")
-    appendLine("Requested from: ${debt.name}")
+    appendLine("Payment requested from: ${debt.name}")
     appendLine("Reason: ${debt.reason.ifBlank { debt.notes }}")
     appendLine("Original amount: ${money(debt.originalAmount)}")
     appendLine("Amount already received: ${money(debtPaidAmount(debt))}")
@@ -6127,8 +6488,10 @@ fun ExpenseForm(
 
                 error = when {
                     title.isBlank() -> "Enter an expense name."
-                    expenseAmount <= 0 -> "Enter a valid amount greater than zero."
+                    title.trim().length > 100 -> "Expense name must be 100 characters or less."
+                    expenseAmount <= 0 || expenseAmount > 999_999_999.99 -> "Enter a valid amount greater than zero."
                     expenseDate == null -> "Enter a valid date as DD-MM-YYYY."
+                    expenseDate > System.currentTimeMillis() -> "Expense date cannot be in the future."
                     else -> ""
                 }
 
@@ -6415,7 +6778,7 @@ fun AboutScreen(done: () -> Unit) {
                 modifier = Modifier.size(112.dp)
             )
             Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Version 5.0")
+            Text("Version 5.1")
             Spacer(Modifier.height(8.dp))
             Text("Created and owned by", color = MaterialTheme.colorScheme.secondary)
             Text("Md. Zahid Alam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -7341,10 +7704,11 @@ fun writePdfToUri(
             val document =
                 PdfDocument()
 
-            val paint =
-                Paint().apply {
-                    textSize = 11f
-                }
+            val paint = Paint().apply { isAntiAlias = true }
+            val teal = android.graphics.Color.rgb(0, 124, 122)
+            val paleTeal = android.graphics.Color.rgb(226, 245, 242)
+            val ink = android.graphics.Color.rgb(35, 42, 42)
+            val muted = android.graphics.Color.rgb(92, 103, 102)
 
             var pageNumber = 1
 
@@ -7360,46 +7724,74 @@ fun writePdfToUri(
             var canvas =
                 page.canvas
 
-            val logo = BitmapFactory.decodeResource(context.resources, com.mdzahidalam.myfinancetracker.R.drawable.app_logo)
-            if (logo != null) canvas.drawBitmap(logo, null, RectF(30f, 24f, 94f, 88f), paint)
-            var y = 112f
-
-            val reportWithOwnership = text + "\n\nGenerated by My Finance Tracker\nPowered by Md. Zahid Alam"
-
-            reportWithOwnership.lines().forEach { line ->
-
-                if (y > 810f) {
-
-                    document.finishPage(
-                        page
-                    )
-
-                    pageNumber++
-
-                    page =
-                        document.startPage(
-                            PdfDocument.PageInfo.Builder(
-                                595,
-                                842,
-                                pageNumber
-                            ).create()
-                        )
-
-                    canvas =
-                        page.canvas
-
-                    y = 35f
-                }
-
-                canvas.drawText(
-                    line.take(95),
-                    30f,
-                    y,
-                    paint
-                )
-
-                y += 16f
+            fun drawHeader() {
+                paint.color = teal
+                canvas.drawRect(0f, 0f, 595f, 104f, paint)
+                val logo = BitmapFactory.decodeResource(context.resources, com.mdzahidalam.myfinancetracker.R.drawable.app_logo)
+                if (logo != null) canvas.drawBitmap(logo, null, RectF(28f, 20f, 92f, 84f), paint)
+                paint.color = android.graphics.Color.WHITE
+                paint.textSize = 18f
+                paint.isFakeBoldText = true
+                canvas.drawText("MY FINANCE TRACKER", 112f, 49f, paint)
+                paint.textSize = 10f
+                paint.isFakeBoldText = false
+                canvas.drawText("Secure personal finance record", 112f, 69f, paint)
             }
+            fun wrap(value: String, maxChars: Int = 76): List<String> {
+                if (value.length <= maxChars) return listOf(value)
+                val result = mutableListOf<String>()
+                var current = ""
+                value.split(" ").forEach { word ->
+                    if ((current.length + word.length + 1) > maxChars) { if (current.isNotBlank()) result += current; current = word }
+                    else current = if (current.isBlank()) word else "$current $word"
+                }
+                if (current.isNotBlank()) result += current
+                return result
+            }
+            drawHeader()
+            var y = 132f
+            val inputLines = text.lines().dropWhile { it.equals("MY FINANCE TRACKER", true) }
+            inputLines.forEach { raw ->
+                val line = raw.trim()
+                if (y > 785f) {
+                    paint.color = muted; paint.textSize = 9f; paint.isFakeBoldText = false
+                    canvas.drawText("Page $pageNumber", 515f, 822f, paint)
+                    document.finishPage(page)
+                    pageNumber++
+                    page = document.startPage(PdfDocument.PageInfo.Builder(595, 842, pageNumber).create())
+                    canvas = page.canvas
+                    drawHeader()
+                    y = 132f
+                }
+                when {
+                    line.isBlank() -> y += 10f
+                    line == line.uppercase(Locale.US) && !line.contains(":") -> {
+                        paint.color = paleTeal; canvas.drawRoundRect(28f, y - 20f, 567f, y + 10f, 6f, 6f, paint)
+                        paint.color = teal; paint.textSize = 14f; paint.isFakeBoldText = true
+                        canvas.drawText(line, 42f, y, paint); y += 40f
+                    }
+                    line.contains(":") -> {
+                        val label = line.substringBefore(":").trim()
+                        val value = line.substringAfter(":").trim()
+                        paint.color = android.graphics.Color.rgb(247, 249, 249)
+                        val wrapped = wrap(value, 52)
+                        val rowHeight = max(30f, 18f * wrapped.size + 10f)
+                        canvas.drawRoundRect(28f, y - 17f, 567f, y - 17f + rowHeight, 4f, 4f, paint)
+                        paint.color = muted; paint.textSize = 10f; paint.isFakeBoldText = true
+                        canvas.drawText(label, 40f, y, paint)
+                        paint.color = ink; paint.isFakeBoldText = false
+                        wrapped.forEachIndexed { index, valueLine -> canvas.drawText(valueLine, 190f, y + index * 16f, paint) }
+                        y += rowHeight + 5f
+                    }
+                    else -> {
+                        paint.color = ink; paint.textSize = 10f; paint.isFakeBoldText = false
+                        wrap(line).forEach { valueLine -> canvas.drawText(valueLine, 34f, y, paint); y += 15f }
+                    }
+                }
+            }
+            paint.color = paleTeal; canvas.drawRect(0f, 796f, 595f, 842f, paint)
+            paint.color = teal; paint.textSize = 9f; paint.isFakeBoldText = true
+            canvas.drawText("Generated by My Finance Tracker • Powered by Md. Zahid Alam", 30f, 822f, paint)
 
             document.finishPage(
                 page
