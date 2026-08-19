@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Patterns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -190,7 +191,8 @@ data class Payment(
     val paymentChannel: String = "",
     val referenceNumber: String = "",
     val counterparty: String = "",
-    val attachments: List<Attachment> = emptyList()
+    val attachments: List<Attachment> = emptyList(),
+    val appliedRequestId: String = ""
 )
 
 data class Attachment(
@@ -209,14 +211,16 @@ data class PaymentRequest(
     val paymentMethod: String,
     val paymentInstructions: String,
     val message: String,
-    val status: String = "UNPAID"
+    val status: String = "UNPAID",
+    val receivedAmount: Double = 0.0
 )
 
 data class ReceiptProfile(
     val fullName: String = "",
     val phone: String = "",
     val email: String = "",
-    val address: String = ""
+    val address: String = "",
+    val signature: Attachment? = null
 )
 
 data class EmiItem(
@@ -397,6 +401,33 @@ fun debtPaidAmount(item: Debt): Double {
 
 fun debtRemainingAmount(item: Debt): Double {
     return max(0.0, item.originalAmount - debtPaidAmount(item))
+}
+
+private fun syncPaymentRequestStatuses(item: Debt): Debt {
+    val requests = item.paymentRequests.map { request ->
+        if (request.status == "CANCELLED") request else {
+            val received = item.payments
+                .filter { it.paidDate != null && it.appliedRequestId == request.id }
+                .sumOf { it.amount }
+                .coerceAtMost(request.amount)
+            request.copy(
+                receivedAmount = received,
+                status = when {
+                    received + 0.005 >= request.amount -> "PAID"
+                    received > 0.0 -> "PARTIALLY PAID"
+                    else -> "UNPAID"
+                }
+            )
+        }
+    }
+    return item.copy(paymentRequests = requests)
+}
+
+private fun availableRequestAmount(item: Debt, excludingRequestId: String = ""): Double {
+    val reserved = item.paymentRequests
+        .filter { it.id != excludingRequestId && it.status in listOf("UNPAID", "PARTIALLY PAID") }
+        .sumOf { max(0.0, it.amount - it.receivedAmount) }
+    return max(0.0, debtRemainingAmount(item) - reserved)
 }
 
 fun debtCompleted(item: Debt): Boolean {
@@ -843,6 +874,7 @@ class FinanceRepository(private val context: Context) {
                 put("phone", data.receiptProfile.phone)
                 put("email", data.receiptProfile.email)
                 put("address", data.receiptProfile.address)
+                put("signature", data.receiptProfile.signature?.let { attachmentsJson(listOf(it)).optJSONObject(0) } ?: JSONObject.NULL)
             })
         }
     }
@@ -868,6 +900,7 @@ class FinanceRepository(private val context: Context) {
         put("paymentInstructions", item.paymentInstructions)
         put("message", item.message)
         put("status", item.status)
+        put("receivedAmount", item.receivedAmount)
     }
 
     private fun paymentJson(payment: Payment): JSONObject {
@@ -891,6 +924,7 @@ class FinanceRepository(private val context: Context) {
             put("referenceNumber", payment.referenceNumber)
             put("counterparty", payment.counterparty)
             put("attachments", attachmentsJson(payment.attachments))
+            put("appliedRequestId", payment.appliedRequestId)
         }
     }
 
@@ -1077,7 +1111,8 @@ class FinanceRepository(private val context: Context) {
                             paymentMethod = item.optString("paymentMethod", "Not recorded"),
                             paymentInstructions = item.optString("paymentInstructions", ""),
                             message = item.optString("message", ""),
-                            status = item.optString("status", "UNPAID")
+                            status = item.optString("status", "UNPAID"),
+                            receivedAmount = item.optDouble("receivedAmount", 0.0)
                         )
                     )
                 }
@@ -1128,7 +1163,8 @@ class FinanceRepository(private val context: Context) {
                             paymentChannel = item.optString("paymentChannel", ""),
                             referenceNumber = item.optString("referenceNumber", ""),
                             counterparty = item.optString("counterparty", ""),
-                            attachments = readAttachments(item.optJSONArray("attachments"))
+                            attachments = readAttachments(item.optJSONArray("attachments")),
+                            appliedRequestId = item.optString("appliedRequestId", "")
                         )
                     )
                 }
@@ -1411,7 +1447,8 @@ class FinanceRepository(private val context: Context) {
                     fullName = it.optString("fullName", ""),
                     phone = it.optString("phone", ""),
                     email = it.optString("email", ""),
-                    address = it.optString("address", "")
+                    address = it.optString("address", ""),
+                    signature = readAttachments(it.optJSONObject("signature")?.let { signature -> JSONArray().put(signature) }).firstOrNull()
                 )
             } ?: ReceiptProfile()
         )
@@ -1862,13 +1899,15 @@ class FinanceViewModel(
 
     fun updateDebtPayment(id: String, payment: Payment) {
         val item = data.debts.firstOrNull { it.id == id } ?: return
-        updateDebt(
+        val currentOtherPaid = item.payments.filter { it.number != payment.number && it.paidDate != null }.sumOf { it.amount }
+        if (payment.paidDate != null && currentOtherPaid + payment.amount > item.originalAmount + 0.005) return
+        updateDebt(syncPaymentRequestStatuses(
             item.copy(
                 payments = item.payments.map {
                     if (it.number == payment.number) payment else it
                 }
             )
-        )
+        ))
     }
 
     fun markEmiPaid(
@@ -1942,10 +1981,11 @@ class FinanceViewModel(
         reference: String = "",
         counterparty: String = "",
         notes: String = "",
-        attachments: List<Attachment> = emptyList()
+        attachments: List<Attachment> = emptyList(),
+        requestId: String = ""
     ) {
 
-        if (amount <= 0) {
+        if (!amount.isFinite() || amount <= 0) {
             return
         }
 
@@ -1975,21 +2015,38 @@ class FinanceViewModel(
                 paymentChannel = channel,
                 referenceNumber = reference,
                 counterparty = counterparty,
-                attachments = attachments
+                attachments = attachments,
+                appliedRequestId = requestId
             )
 
-        updateDebt(
+        updateDebt(syncPaymentRequestStatuses(
             item.copy(
                 payments =
                     item.payments + payment
             )
-        )
+        ))
     }
 
     fun addPaymentRequest(debtId: String, request: PaymentRequest) {
         val debt = data.debts.firstOrNull { it.id == debtId } ?: return
         if (debt.direction != "Owed to Me") return
+        if (!request.amount.isFinite() || request.amount <= 0 || request.amount > availableRequestAmount(debt) + 0.005) return
         updateDebt(debt.copy(paymentRequests = debt.paymentRequests + request))
+    }
+
+    fun updatePaymentRequest(debtId: String, request: PaymentRequest) {
+        val debt = data.debts.firstOrNull { it.id == debtId } ?: return
+        val old = debt.paymentRequests.firstOrNull { it.id == request.id } ?: return
+        if (old.status !in listOf("UNPAID", "PARTIALLY PAID")) return
+        if (!request.amount.isFinite() || request.amount < old.receivedAmount || request.amount > availableRequestAmount(debt, request.id) + old.receivedAmount + 0.005) return
+        updateDebt(syncPaymentRequestStatuses(debt.copy(paymentRequests = debt.paymentRequests.map { if (it.id == request.id) request else it })))
+    }
+
+    fun cancelPaymentRequest(debtId: String, requestId: String) {
+        val debt = data.debts.firstOrNull { it.id == debtId } ?: return
+        updateDebt(debt.copy(paymentRequests = debt.paymentRequests.map {
+            if (it.id == requestId && it.status in listOf("UNPAID", "PARTIALLY PAID")) it.copy(status = "CANCELLED") else it
+        }))
     }
 
     fun updateReceiptProfile(profile: ReceiptProfile) {
@@ -2081,9 +2138,9 @@ fun FinanceApp(
     BackHandler(enabled = selectedType.isNotBlank() || tab != 0) {
         if (selectedType.isNotBlank()) {
             selectedType = when (selectedType) {
-                "emi_history", "emi_documents", "emi_financing", "emi_payment" -> "emi_detail"
-                "loan_history", "loan_documents", "loan_financing", "loan_payment" -> "loan_detail"
-                "debt_history", "debt_documents", "debt_financing", "debt_payment" -> "debt_detail"
+            "emi_history", "emi_documents", "emi_financing", "emi_information", "emi_payment" -> "emi_detail"
+            "loan_history", "loan_documents", "loan_financing", "loan_information", "loan_payment" -> "loan_detail"
+            "debt_history", "debt_documents", "debt_financing", "debt_information", "debt_payment" -> "debt_detail"
                 "emi" -> if (selectedId.isNotBlank()) "emi_detail" else ""
                 "loan" -> if (selectedId.isNotBlank()) "loan_detail" else ""
                 "debt" -> if (selectedId.isNotBlank()) "debt_detail" else ""
@@ -2278,6 +2335,15 @@ fun FinanceApp(
                         kind = selectedType.removeSuffix("_financing"),
                         id = selectedId,
                         onBack = { selectedType = selectedType.removeSuffix("_financing") + "_detail" }
+                    )
+                }
+
+                selectedType.endsWith("_information") -> {
+                    PaymentPlanInformation(
+                        viewModel = viewModel,
+                        kind = selectedType.removeSuffix("_information"),
+                        id = selectedId,
+                        onBack = { selectedType = selectedType.removeSuffix("_information") + "_detail" }
                     )
                 }
 
@@ -2603,6 +2669,8 @@ fun PaymentPlanDetail(
     onOpen: (String) -> Unit
 ) {
     var showRequestDialog by remember { mutableStateOf(false) }
+    var editingRequest by remember { mutableStateOf<PaymentRequest?>(null) }
+    var cancellingRequest by remember { mutableStateOf<PaymentRequest?>(null) }
     val emi = viewModel.data.emis.find { it.id == id }
     val loan = viewModel.data.loans.find { it.id == id }
     val debt = viewModel.data.debts.find { it.id == id }
@@ -2638,15 +2706,35 @@ fun PaymentPlanDetail(
             Text("This record is view-only. Reopen or restore it from the plan menu before making changes.")
         }
         DetailNavigationButton("Payment History", "${payments.count { it.paidDate != null }} recorded") { onOpen("history") }
+        DetailNavigationButton("Plan Information", "View all original plan details") { onOpen("information") }
         DetailNavigationButton("Documents", if (documents.isEmpty()) "No documents" else "${documents.size} attached") { onOpen("documents") }
         DetailNavigationButton("Financing Information", "Source, method, reference and notes") { onOpen("financing") }
         if (debt != null && debt.paymentRequests.isNotEmpty()) {
             Text("Payment Requests", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            debt.paymentRequests.sortedByDescending { it.createdDate }.forEach { PaymentRequestCard(debt, it, viewModel.data.receiptProfile) }
+            debt.paymentRequests.sortedByDescending { it.createdDate }.forEach { request ->
+                PaymentRequestCard(
+                    debt, request, viewModel.data.receiptProfile,
+                    onEdit = { editingRequest = request },
+                    onCancel = { cancellingRequest = request }
+                )
+            }
         }
     }
     if (showRequestDialog && debt != null) {
         PaymentRequestDialog(debt, onSave = { viewModel.addPaymentRequest(debt.id, it); showRequestDialog = false }, onDismiss = { showRequestDialog = false })
+    }
+    if (editingRequest != null && debt != null) {
+        PaymentRequestDialog(debt, existing = editingRequest, onSave = { viewModel.updatePaymentRequest(debt.id, it); editingRequest = null }, onDismiss = { editingRequest = null })
+    }
+    cancellingRequest?.let { request ->
+        ConfirmationDialog(
+            ConfirmationRequest(
+                title = "Cancel Payment Request?",
+                message = "${request.requestNumber} will remain in your records but cannot receive further payments. This action cannot be undone.",
+                confirmLabel = "Cancel Request",
+                onConfirm = { debt?.let { viewModel.cancelPaymentRequest(it.id, request.id) } }
+            )
+        ) { cancellingRequest = null }
     }
 }
 
@@ -2731,6 +2819,36 @@ fun PaymentPlanFinancing(viewModel: FinanceViewModel, kind: String, id: String, 
 }
 
 @Composable
+fun PaymentPlanInformation(viewModel: FinanceViewModel, kind: String, id: String, onBack: () -> Unit) {
+    val emi = viewModel.data.emis.find { it.id == id }
+    val loan = viewModel.data.loans.find { it.id == id }
+    val debt = viewModel.data.debts.find { it.id == id }
+    FormColumn(title = "Plan Information", onBack = onBack, readOnly = true) {
+        when {
+            emi != null -> {
+                InfoRow("Item name", emi.name); InfoRow("Category", emi.category); InfoRow("Seller / provider", emi.seller)
+                InfoRow("Purchase price", money(emi.price)); InfoRow("Down payment", money(emi.downPayment)); InfoRow("Financed amount", money(emi.financedAmount))
+                InfoRow("Interest rate", "${emi.interestRate}%"); InfoRow("Interest amount", money(emi.interestAmount)); InfoRow("Total payable", money(emi.totalPayable))
+                InfoRow("Installments", emi.installments.toString()); InfoRow("Monthly payment", money(emi.monthlyPayment)); InfoRow("Start date", dateText(emi.startDate))
+                InfoRow("Due day", emi.dueDay.toString()); InfoRow("Reminder days", emi.reminderDays.joinToString(", ")); InfoRow("Status", if (emi.archived) "Archived" else if (emiCompleted(emi)) "Completed" else "Active")
+            }
+            loan != null -> {
+                InfoRow("Loan name", loan.name); InfoRow("Loan type", loan.type); InfoRow("Lender", loan.lender)
+                InfoRow("Principal", money(loan.principal)); InfoRow("Interest rate", "${loan.interestRate}%"); InfoRow("Interest amount", money(loan.interestAmount)); InfoRow("Total payable", money(loan.totalPayable))
+                InfoRow("Repayment mode", loan.repaymentMode); InfoRow("Installments", loan.installments.toString()); InfoRow("Monthly payment", money(loan.monthlyPayment)); InfoRow("Start date", dateText(loan.startDate))
+                InfoRow("Due day", loan.dueDay.toString()); InfoRow("Reminder days", loan.reminderDays.joinToString(", ")); InfoRow("Status", if (loan.archived) "Archived" else if (loanCompleted(loan)) "Completed" else "Active")
+            }
+            debt != null -> {
+                InfoRow("Person / organization", debt.name); InfoRow("Direction", debt.direction); InfoRow("Original amount", money(debt.originalAmount))
+                InfoRow("Paid / received", money(debtPaidAmount(debt))); InfoRow("Remaining", money(debtRemainingAmount(debt))); InfoRow("Due date", debt.dueDate?.let { dateText(it) } ?: "Not specified")
+                InfoRow("Reason", debt.reason); InfoRow("Notes", debt.notes); InfoRow("Status", if (debt.archived) "Archived" else if (debtCompleted(debt)) "Completed" else "Active")
+            }
+            else -> Text("Record not found.")
+        }
+    }
+}
+
+@Composable
 private fun InfoRow(label: String, value: String) {
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
@@ -2747,7 +2865,9 @@ fun PaymentPlanPayment(viewModel: FinanceViewModel, kind: String, id: String, on
     val debt = viewModel.data.debts.find { it.id == id }
     val pending = (emi?.payments ?: loan?.payments ?: emptyList()).firstOrNull { it.paidDate == null }
     FormColumn(title = if (debt?.direction == "Owed to Me") "Receive Payment" else "Record Payment", onBack = onBack, readOnly = false) {
-        if (debt != null) {
+        if (debt != null && debtCompleted(debt)) {
+            Text("This debt is fully completed. No additional payment can be recorded.", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        } else if (debt != null) {
             DebtPaymentEntry(viewModel, debt, onSaved = onBack)
         } else if (pending == null) {
             Text("There is no pending payment for this plan.")
@@ -2776,6 +2896,11 @@ private fun DebtPaymentEntry(viewModel: FinanceViewModel, debt: Debt, onSaved: (
     var attachments by remember { mutableStateOf(emptyList<Attachment>()) }
     var error by remember { mutableStateOf("") }
     val remaining = debtRemainingAmount(debt)
+    val openRequests = debt.paymentRequests.filter { it.status in listOf("UNPAID", "PARTIALLY PAID") }
+    val requestOptions = listOf("No payment request") + openRequests.map { "${it.requestNumber} • ${money(it.amount - it.receivedAmount)} left" }
+    var requestSelection by remember(debt.id, openRequests.map { it.id to it.status }) {
+        mutableStateOf(if (openRequests.size == 1) requestOptions[1] else "No payment request")
+    }
 
     Text("${debt.name} • Remaining ${money(remaining)}", fontWeight = FontWeight.Bold)
     Field(if (debt.direction == "Owed to Me") "Received amount" else "Payment amount", amount) { amount = it; error = "" }
@@ -2786,21 +2911,26 @@ private fun DebtPaymentEntry(viewModel: FinanceViewModel, debt: Debt, onSaved: (
     Field("Transaction / reference ID", reference) { reference = it }
     Field("Payment notes", notes) { notes = it }
     AttachmentSection(attachments, maxFiles = 3) { attachments = it }
+    if (debt.direction == "Owed to Me" && openRequests.isNotEmpty()) {
+        ChoiceDropdown("Apply payment to", requestSelection, requestOptions) { requestSelection = it }
+    }
     if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
     Button(onClick = {
         val value = amount.toDoubleOrNull() ?: 0.0
         val date = parseExpenseDate(paidDate)
+        val selectedRequest = openRequests.find { requestSelection.startsWith(it.requestNumber) }
         error = when {
-            value <= 0.0 -> "Enter a valid amount greater than zero."
+            !value.isFinite() || value <= 0.0 -> "Enter a valid amount greater than zero."
             value > 999_999_999.99 -> "Amount is too large."
             value > remaining + 0.005 -> "Amount cannot exceed the remaining ${money(remaining)}."
+            selectedRequest != null && value > (selectedRequest.amount - selectedRequest.receivedAmount) + 0.005 -> "Amount cannot exceed this request's outstanding balance."
             date == null -> "Select a valid payment date."
             date > System.currentTimeMillis() -> "Payment date cannot be in the future."
             (method == "Mobile banking" || method == "Bank transfer") && channel.isBlank() -> "Enter the payment provider or bank."
             else -> ""
         }
         if (error.isBlank() && date != null) {
-            viewModel.markDebtPaid(debt.id, value, paidDate = date, method = method, channel = channel, reference = reference.trim(), counterparty = debt.name, notes = notes.trim(), attachments = attachments)
+            viewModel.markDebtPaid(debt.id, value, paidDate = date, method = method, channel = channel, reference = reference.trim(), counterparty = debt.name, notes = notes.trim(), attachments = attachments, requestId = selectedRequest?.id ?: "")
             onSaved()
         }
     }, modifier = Modifier.fillMaxWidth()) { Text(if (debt.direction == "Owed to Me") "Save Received Amount" else "Save Payment") }
@@ -4366,6 +4496,7 @@ private fun paymentReceiptText(
         appendLine()
         appendLine("Personal payment record generated by My Finance Tracker. Recipient confirmation or signature may be required as proof of payment.")
         appendLine("Powered by Md. Zahid Alam")
+        profile.signature?.let { appendLine("[[SIGNATURE:${it.contentBase64}]]") }
     }
 }
 
@@ -4551,7 +4682,13 @@ fun PaymentHistory(
                         ) {
                             Text(if (payment.receiptUri == null) "Attach" else "Receipt")
                         }
-                        if (payment.paidDate != null) {
+                    }
+
+                    if (payment.paidDate != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
                             TextButton(onClick = {
                                 val fileName = "MFT-Receipt-${payment.number}-${dateText(payment.paidDate)}.pdf"
                                 val content = paymentReceiptText(planName, direction, planTotal, payments, payment, profile)
@@ -5036,10 +5173,13 @@ fun EmiForm(
                     itemName.length > 100 ->
                         "Item name must be 100 characters or less."
 
-                    purchasePrice <= 0 || purchasePrice > 999_999_999.99 ->
+                    category.trim().length !in 2..60 || seller.trim().length > 100 ->
+                        "Enter a valid category; seller/provider must be 100 characters or less."
+
+                    !purchasePrice.isFinite() || purchasePrice <= 0 || purchasePrice > 999_999_999.99 ->
                         "Enter a valid price."
 
-                    rate !in 0.0..100.0 || enteredInterest < 0 ->
+                    !rate.isFinite() || !enteredInterest.isFinite() || rate !in 0.0..100.0 || enteredInterest < 0 ->
                         "Interest rate must be 0-100 and interest amount cannot be negative."
 
                     rate > 0 && enteredInterest > 0 ->
@@ -5609,10 +5749,13 @@ fun LoanForm(
                     name.trim().length > 100 ->
                         "Loan name must be 100 characters or less."
 
-                    principalAmount <= 0 || principalAmount > 999_999_999.99 ->
+                    type.trim().length !in 2..60 || lender.trim().length > 100 ->
+                        "Enter a valid loan type; lender must be 100 characters or less."
+
+                    !principalAmount.isFinite() || principalAmount <= 0 || principalAmount > 999_999_999.99 ->
                         "Enter principal."
 
-                    interestRate !in 0.0..100.0 || enteredInterest < 0 ->
+                    !interestRate.isFinite() || !enteredInterest.isFinite() || interestRate !in 0.0..100.0 || enteredInterest < 0 ->
                         "Interest rate must be 0-100 and interest amount cannot be negative."
 
                     interestRate > 0 && enteredInterest > 0 ->
@@ -6030,7 +6173,7 @@ fun DebtForm(
                 OutlinedButton(
                     onClick = {
                         val updatedAmount = amount.toDoubleOrNull() ?: 0.0
-                        if (name.isBlank() || updatedAmount <= 0 || updatedAmount + 0.005 < paid) {
+                        if (name.isBlank() || name.trim().length > 100 || !updatedAmount.isFinite() || updatedAmount <= 0 || updatedAmount > 999_999_999.99 || updatedAmount + 0.005 < paid || notes.length > 500 || debtReference.length > 100) {
                             paymentError = "Enter a valid name and an original amount not below the recorded total."
                         } else {
                             pendingDebtUpdate = ConfirmationRequest(
@@ -6196,9 +6339,9 @@ fun DebtForm(
                     val previousAmount = previousPayment.toDoubleOrNull() ?: 0.0
 
                     if (
-                        name.isBlank() || name.trim().length > 100 ||
-                        originalAmount <= 0 || originalAmount > 999_999_999.99 ||
-                        previousAmount < 0 ||
+                        name.isBlank() || name.trim().length > 100 || notes.length > 500 || debtReference.length > 100 ||
+                        !originalAmount.isFinite() || originalAmount <= 0 || originalAmount > 999_999_999.99 ||
+                        !previousAmount.isFinite() || previousAmount < 0 ||
                         previousAmount > originalAmount
                     ) {
 
@@ -6280,6 +6423,8 @@ private fun paymentRequestText(debt: Debt, request: PaymentRequest, profile: Rec
     appendLine("Original amount: ${money(debt.originalAmount)}")
     appendLine("Amount already received: ${money(debtPaidAmount(debt))}")
     appendLine("Amount requested: ${money(request.amount)}")
+    appendLine("Amount received for request: ${money(request.receivedAmount)}")
+    appendLine("Request status: ${request.status}")
     appendLine("Remaining to receive: ${money(debtRemainingAmount(debt))}")
     appendLine("Preferred method: ${request.paymentMethod}")
     if (request.paymentInstructions.isNotBlank()) appendLine("Payment instructions: ${request.paymentInstructions}")
@@ -6288,17 +6433,18 @@ private fun paymentRequestText(debt: Debt, request: PaymentRequest, profile: Rec
     appendLine("This is a personal payment request generated from the issuer's records. It is not a bank statement, legal judgment, or tax invoice.")
     appendLine("Generated by My Finance Tracker")
     appendLine("Powered by Md. Zahid Alam")
+    profile.signature?.let { appendLine("[[SIGNATURE:${it.contentBase64}]]") }
 }
 
 @Composable
-fun PaymentRequestCard(debt: Debt, request: PaymentRequest, profile: ReceiptProfile) {
+fun PaymentRequestCard(
+    debt: Debt,
+    request: PaymentRequest,
+    profile: ReceiptProfile,
+    onEdit: (() -> Unit)? = null,
+    onCancel: (() -> Unit)? = null
+) {
     val context = LocalContext.current
-    val receivedSinceRequest = debt.payments.filter { (it.paidDate ?: 0L) >= request.createdDate }.sumOf { it.amount }
-    val displayStatus = when {
-        receivedSinceRequest + 0.005 >= request.amount -> "PAID"
-        receivedSinceRequest > 0 -> "PARTIALLY PAID"
-        else -> "UNPAID"
-    }
     var pendingText by remember { mutableStateOf("") }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null && pendingText.isNotBlank()) writePdfToUri(context, uri, pendingText)
@@ -6309,32 +6455,41 @@ fun PaymentRequestCard(debt: Debt, request: PaymentRequest, profile: ReceiptProf
             Text(request.requestNumber, fontWeight = FontWeight.Bold)
             Text("Requested ${money(request.amount)} • ${dateText(request.createdDate)}")
             request.dueDate?.let { Text("Due ${dateText(it)}") }
-            Text(displayStatus, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            TextButton(onClick = {
-                pendingText = paymentRequestText(debt, request, profile)
-                launcher.launch("${request.requestNumber}.pdf")
-            }) { Text("Save PDF") }
-            TextButton(onClick = {
-                sharePdf(context, "${request.requestNumber}.pdf", paymentRequestText(debt, request, profile))
-            }) { Text("Share") }
+            if (request.receivedAmount > 0) Text("Received ${money(request.receivedAmount)}")
+            Text(request.status, color = if (request.status == "CANCELLED") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = {
+                    pendingText = paymentRequestText(debt, request, profile)
+                    launcher.launch("${request.requestNumber}.pdf")
+                }) { Text("Save PDF") }
+                TextButton(onClick = { sharePdf(context, "${request.requestNumber}.pdf", paymentRequestText(debt, request, profile)) }) { Text("Share") }
+            }
+            if (request.status in listOf("UNPAID", "PARTIALLY PAID")) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    onEdit?.let { TextButton(onClick = it) { Text("Edit") } }
+                    onCancel?.let { TextButton(onClick = it) { Text("Cancel", color = MaterialTheme.colorScheme.error) } }
+                }
+            }
         }
     }
 }
 
 @Composable
-fun PaymentRequestDialog(debt: Debt, onSave: (PaymentRequest) -> Unit, onDismiss: () -> Unit) {
-    var amount by remember { mutableStateOf(debtRemainingAmount(debt).toString()) }
-    var dueDate by remember { mutableStateOf(expenseDateText(System.currentTimeMillis())) }
-    var method by remember { mutableStateOf("Mobile banking") }
-    var instructions by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
+fun PaymentRequestDialog(debt: Debt, existing: PaymentRequest? = null, onSave: (PaymentRequest) -> Unit, onDismiss: () -> Unit) {
+    val maximum = availableRequestAmount(debt, existing?.id ?: "") + (existing?.receivedAmount ?: 0.0)
+    var amount by remember { mutableStateOf((existing?.amount ?: maximum).toString()) }
+    var dueDate by remember { mutableStateOf(expenseDateText(existing?.dueDate ?: System.currentTimeMillis())) }
+    var method by remember { mutableStateOf(existing?.paymentMethod ?: "Mobile banking") }
+    var instructions by remember { mutableStateOf(existing?.paymentInstructions ?: "") }
+    var message by remember { mutableStateOf(existing?.message ?: "") }
     var error by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Payment Request") },
+        title = { Text(if (existing == null) "Create Payment Request" else "Edit Payment Request") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text("Request money from ${debt.name}")
+                Text("Available to request: ${money(maximum)}", color = MaterialTheme.colorScheme.primary)
                 Field("Requested amount", amount) { amount = it }
                 DatePickerField("Due date", dueDate) { dueDate = it }
                 ChoiceDropdown("Preferred payment method", method, listOf("Cash", "Bank transfer", "Mobile banking", "Cheque", "Other")) { method = it }
@@ -6348,26 +6503,33 @@ fun PaymentRequestDialog(debt: Debt, onSave: (PaymentRequest) -> Unit, onDismiss
                 val value = amount.toDoubleOrNull() ?: 0.0
                 val parsedDue = parseExpenseDate(dueDate)
                 error = when {
-                    value <= 0 -> "Enter a valid requested amount."
-                    value > debtRemainingAmount(debt) + 0.005 -> "Request cannot exceed the remaining balance."
+                    !value.isFinite() || value <= 0 -> "Enter a valid requested amount."
+                    value > maximum + 0.005 -> "Request cannot exceed the available receivable balance."
+                    value < (existing?.receivedAmount ?: 0.0) -> "Request amount cannot be below the amount already received."
                     parsedDue == null -> "Enter a valid due date."
+                    parsedDue < Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis -> "Due date cannot be in the past."
+                    method in listOf("Bank transfer", "Mobile banking") && instructions.isBlank() -> "Enter payment instructions for the selected method."
+                    instructions.length > 300 || message.length > 500 -> "Instructions must be 300 characters or less and message 500 or less."
                     else -> ""
                 }
                 if (error.isBlank()) {
                     val stamp = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
                     onSave(
                         PaymentRequest(
-                            requestNumber = "MFT-REQ-$stamp-${UUID.randomUUID().toString().take(4).uppercase(Locale.US)}",
-                            createdDate = System.currentTimeMillis(),
+                            id = existing?.id ?: UUID.randomUUID().toString(),
+                            requestNumber = existing?.requestNumber ?: "MFT-REQ-$stamp-${UUID.randomUUID().toString().take(4).uppercase(Locale.US)}",
+                            createdDate = existing?.createdDate ?: System.currentTimeMillis(),
                             dueDate = parsedDue,
                             amount = value,
                             paymentMethod = method,
                             paymentInstructions = instructions.trim(),
-                            message = message.trim()
+                            message = message.trim(),
+                            status = existing?.status ?: "UNPAID",
+                            receivedAmount = existing?.receivedAmount ?: 0.0
                         )
                     )
                 }
-            }) { Text("Create") }
+            }) { Text(if (existing == null) "Create" else "Save Changes") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
@@ -6447,9 +6609,10 @@ fun ExpenseForm(
                 error = when {
                     title.isBlank() -> "Enter an expense name."
                     title.trim().length > 100 -> "Expense name must be 100 characters or less."
-                    expenseAmount <= 0 || expenseAmount > 999_999_999.99 -> "Enter a valid amount greater than zero."
+                    !expenseAmount.isFinite() || expenseAmount <= 0 || expenseAmount > 999_999_999.99 -> "Enter a valid amount greater than zero."
                     expenseDate == null -> "Enter a valid date as DD-MM-YYYY."
                     expenseDate > System.currentTimeMillis() -> "Expense date cannot be in the future."
+                    notes.length > 500 -> "Notes must be 500 characters or less."
                     else -> ""
                 }
 
@@ -6567,6 +6730,9 @@ private fun sharePdf(context: Context, fileName: String, text: String) {
 fun AttachmentSection(
     attachments: List<Attachment>,
     maxFiles: Int,
+    title: String = "Supporting documents (optional)",
+    mimeTypes: Array<String> = arrayOf("image/*", "application/pdf"),
+    buttonLabel: String = "Attach image or PDF",
     onChange: (List<Attachment>) -> Unit
 ) {
     val context = LocalContext.current
@@ -6584,7 +6750,7 @@ fun AttachmentSection(
         }
     }
 
-    Text("Supporting documents (optional)", fontWeight = FontWeight.Bold)
+    Text(title, fontWeight = FontWeight.Bold)
     attachments.forEach { attachment ->
         Card(modifier = Modifier.fillMaxWidth()) {
             Row(
@@ -6603,9 +6769,9 @@ fun AttachmentSection(
     }
     if (!LocalFormReadOnly.current && attachments.size < maxFiles) {
         OutlinedButton(
-            onClick = { launcher.launch(arrayOf("image/*", "application/pdf")) },
+            onClick = { launcher.launch(mimeTypes) },
             modifier = Modifier.fillMaxWidth()
-        ) { Text("Attach image or PDF (${attachments.size}/$maxFiles)") }
+        ) { Text("$buttonLabel (${attachments.size}/$maxFiles)") }
     }
     if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
     Text("Documents are included inside encrypted app data and encrypted backups.", style = MaterialTheme.typography.bodySmall)
@@ -6704,19 +6870,46 @@ fun ReceiptProfileForm(existing: ReceiptProfile, onSave: (ReceiptProfile) -> Uni
     var phone by remember { mutableStateOf(existing.phone) }
     var email by remember { mutableStateOf(existing.email) }
     var address by remember { mutableStateOf(existing.address) }
-    val changed = fullName != existing.fullName || phone != existing.phone || email != existing.email || address != existing.address
+    var signature by remember { mutableStateOf(existing.signature?.let { listOf(it) } ?: emptyList()) }
+    var error by remember { mutableStateOf("") }
+    val changed = fullName != existing.fullName || phone != existing.phone || email != existing.email || address != existing.address || signature.firstOrNull() != existing.signature
     FormColumn("Receipt Profile", onBack = done, hasUnsavedChanges = changed) {
         Text("This identity appears as the issuer on payment receipts and payment requests. App ownership remains separate.")
         Field("Full name", fullName) { fullName = it }
         Field("Phone (optional)", phone) { phone = it }
         Field("Email (optional)", email) { email = it }
         Field("Address (optional)", address) { address = it }
+        Text("Signature (optional)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("Attach a PNG or JPEG signature image. It is stored with your encrypted app data and added to generated receipts and payment requests.", style = MaterialTheme.typography.bodySmall)
+        AttachmentSection(
+            signature,
+            maxFiles = 1,
+            title = "Signature image (optional)",
+            mimeTypes = arrayOf("image/*"),
+            buttonLabel = "Attach signature image"
+        ) { selected ->
+            signature = selected.filter { it.mimeType in listOf("image/png", "image/jpeg", "image/jpg", "image/webp") }.take(1)
+            if (selected.isNotEmpty() && signature.isEmpty()) error = "Signature must be a PNG, JPEG, or WebP image."
+        }
+        if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
         Button(
             onClick = {
-                onSave(ReceiptProfile(fullName.trim(), phone.trim(), email.trim(), address.trim()))
-                done()
+                val cleanPhone = phone.trim()
+                val cleanEmail = email.trim()
+                val phoneDigits = cleanPhone.filter { it.isDigit() }
+                error = when {
+                    fullName.isBlank() -> "Enter your full name."
+                    fullName.trim().length !in 2..100 -> "Full name must be between 2 and 100 characters."
+                    cleanPhone.isNotBlank() && (!Regex("^\\+?[0-9][0-9 -]*$").matches(cleanPhone) || phoneDigits.length !in 7..15) -> "Enter a valid phone number containing 7-15 digits."
+                    cleanEmail.isNotBlank() && !Patterns.EMAIL_ADDRESS.matcher(cleanEmail).matches() -> "Enter a valid email address."
+                    address.length > 250 -> "Address must be 250 characters or less."
+                    else -> ""
+                }
+                if (error.isBlank()) {
+                    onSave(ReceiptProfile(fullName.trim(), cleanPhone, cleanEmail, address.trim(), signature.firstOrNull()))
+                    done()
+                }
             },
-            enabled = fullName.isNotBlank(),
             modifier = Modifier.fillMaxWidth()
         ) { Text("Save Receipt Profile") }
     }
@@ -6736,7 +6929,7 @@ fun AboutScreen(done: () -> Unit) {
                 modifier = Modifier.size(112.dp)
             )
             Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Version 5.1")
+            Text("Version 5.2")
             Spacer(Modifier.height(8.dp))
             Text("Created and owned by", color = MaterialTheme.colorScheme.secondary)
             Text("Md. Zahid Alam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -7722,6 +7915,24 @@ fun writePdfToUri(
                     y = 132f
                 }
                 when {
+                    line.startsWith("[[SIGNATURE:") && line.endsWith("]]" ) -> {
+                        val encoded = line.removePrefix("[[SIGNATURE:").removeSuffix("]]" )
+                        val signature = runCatching {
+                            val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        }.getOrNull()
+                        if (signature != null) {
+                            paint.color = muted; paint.textSize = 10f; paint.isFakeBoldText = true
+                            canvas.drawText("Authorized signature", 40f, y, paint)
+                            val ratio = signature.width.toFloat() / signature.height.coerceAtLeast(1)
+                            val height = 58f
+                            val width = minOf(170f, height * ratio)
+                            canvas.drawBitmap(signature, null, RectF(40f, y + 8f, 40f + width, y + 8f + height), paint)
+                            paint.color = muted
+                            canvas.drawLine(40f, y + 72f, 230f, y + 72f, paint)
+                            y += 90f
+                        }
+                    }
                     line.isBlank() -> y += 10f
                     line == line.uppercase(Locale.US) && !line.contains(":") -> {
                         paint.color = paleTeal; canvas.drawRoundRect(28f, y - 20f, 567f, y + 10f, 6f, 6f, paint)
