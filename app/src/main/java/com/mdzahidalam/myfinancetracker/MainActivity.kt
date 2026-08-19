@@ -5213,27 +5213,6 @@ fun EmiForm(
         }
         }
 
-        if (false && existing != null) {
-
-            Text(
-                "Payment History",
-                style =
-                    MaterialTheme.typography
-                        .titleLarge,
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            PaymentHistory(
-                payments = existing.payments,
-                onUpdate = if (viewOnly) null else {
-                    { payment -> viewModel.updateEmiPayment(existing.id, payment) }
-                },
-                planName = existing.name,
-                planTotal = existing.totalPayable,
-                profile = viewModel.data.receiptProfile
-            )
-        }
     }
 
     pendingUpdate?.let { item ->
@@ -5803,27 +5782,6 @@ fun LoanForm(
         }
         }
 
-        if (false && existing != null) {
-
-            Text(
-                "Repayment History",
-                style =
-                    MaterialTheme.typography
-                        .titleLarge,
-                fontWeight =
-                    FontWeight.Bold
-            )
-
-            PaymentHistory(
-                payments = existing.payments,
-                onUpdate = if (viewOnly) null else {
-                    { payment -> viewModel.updateLoanPayment(existing.id, payment) }
-                },
-                planName = existing.name,
-                planTotal = existing.totalPayable,
-                profile = viewModel.data.receiptProfile
-            )
-        }
     }
 
     pendingUpdate?.let { loan ->
