@@ -1,8 +1,14 @@
-# My Finance Tracker — Version 5.0
+# My Finance Tracker — Version 5.1
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 5.0 updates
+## Version 5.1 updates
+
+- Separate EMI, Loan, and Debt list pages with focused plan overview, payment, history, and document screens.
+- Debt payments can be recorded with an earlier payment date.
+- Expense attachments can be opened directly from the expense card.
+- Professional branded PDF layouts for receipts, requests, and reports.
+- Stronger validation for names, amounts, interest, installments, payment methods, and dates.
 
 - AES-256-GCM encrypted financial records protected by Android Keystore
 - Password-protected encrypted backup with safe legacy JSON import
@@ -24,4 +30,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The workflow uploads a signed V5.0 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
+The workflow uploads a signed V5.1 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.

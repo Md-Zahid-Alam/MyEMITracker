@@ -1,7 +1,7 @@
-My Finance Tracker - Version 5.0
+My Finance Tracker - Version 5.1
 
 Package: com.mdzahidalam.myfinancetracker
-Version code: 14
+Version code: 15
 
 Offline Android finance tracker with encrypted records/backups, financing details, supporting documents, payment methods, separated debt directions, PDF receipts, owed-to-me payment requests, expenses, and reports.
 
