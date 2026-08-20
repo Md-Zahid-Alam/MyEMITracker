@@ -1,0 +1,33 @@
+My Finance Tracker - Version 5.2
+
+Debt corrections
+- Blocks payments when a debt is completed.
+- Rechecks the latest remaining balance when saving, preventing duplicate-tap and stale-screen overpayments.
+- Prevents edited debt payments from making the paid total exceed the original debt.
+
+Payment requests
+- New requests cannot exceed the unreserved receivable balance.
+- Received payments can be linked to an open request.
+- A single open request is selected automatically when recording received money.
+- Request states: UNPAID, PARTIALLY PAID, PAID and CANCELLED.
+- Open requests can be edited, but not below money already received.
+- Cancellation requires a warning and remains permanently visible as a read-only record.
+- Regenerated PDFs show the latest amount received and request status.
+
+Plans and payment history
+- All active, completed and archived records have a read-only Plan Information page.
+- Payment-history actions use separate compact rows so Save PDF and Share remain visible.
+- Completed debts no longer show a usable payment-entry form.
+
+Receipt Profile and signature
+- Validates owner name, phone number, email and address.
+- Supports an optional PNG, JPEG or WebP signature image.
+- Signature is stored in encrypted app data and encrypted backups.
+- Signature appears on generated payment receipt and payment-request PDFs.
+
+Additional validation
+- Added practical length and range validation across EMI, Loan, Debt, Expense, Payment and Payment Request forms.
+
+Build
+- Version name: 5.2
+- Version code: 16
