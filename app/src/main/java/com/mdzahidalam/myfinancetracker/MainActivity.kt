@@ -120,6 +120,8 @@ import org.json.JSONObject
 import java.security.MessageDigest
 import java.security.KeyStore
 import java.security.SecureRandom
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -2669,6 +2671,7 @@ fun PaymentsHub(
 
 @Composable
 fun PaymentsLanding(viewModel: FinanceViewModel, onOpenSection: (String) -> Unit) {
+    var debtsExpanded by remember { mutableStateOf(false) }
     val activeEmis = viewModel.data.emis.filter { !it.archived && !emiCompleted(it) }
     val activeLoans = viewModel.data.loans.filter { !it.archived && !loanCompleted(it) }
     val activeDebts = viewModel.data.debts.filter { !it.archived && !debtCompleted(it) }
@@ -2695,8 +2698,23 @@ fun PaymentsLanding(viewModel: FinanceViewModel, onOpenSection: (String) -> Unit
                 onClick = { onOpenSection("Loans") }
             )
         }
-        item { PaymentSectionCard("Money I Owe", "${activeDebts.count { it.direction == "I Owe" }} active • ${money(debtToPay)} to pay") { onOpenSection("DebtsOwe") } }
-        item { PaymentSectionCard("Money Owed to Me", "${activeDebts.count { it.direction == "Owed to Me" }} active • ${money(moneyToReceive)} to receive") { onOpenSection("DebtsOwed") } }
+        item {
+            PaymentSectionCard("Debts", "Pay ${money(debtToPay)} • Receive ${money(moneyToReceive)}") { debtsExpanded = !debtsExpanded }
+        }
+        if (debtsExpanded) {
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = { onOpenSection("DebtsOwe") }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Money I Owe • ${activeDebts.count { it.direction == "I Owe" }} active • ${money(debtToPay)}")
+                        }
+                        OutlinedButton(onClick = { onOpenSection("DebtsOwed") }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Money Owed to Me • ${activeDebts.count { it.direction == "Owed to Me" }} active • ${money(moneyToReceive)}")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -6996,7 +7014,7 @@ fun AboutScreen(done: () -> Unit) {
                 modifier = Modifier.size(112.dp)
             )
             Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Version 5.3")
+            Text("Version 5.4")
             Spacer(Modifier.height(8.dp))
             Text("Created and owned by", color = MaterialTheme.colorScheme.secondary)
             Text("Md. Zahid Alam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -7426,7 +7444,7 @@ fun Reports(
 ) {
     val context = LocalContext.current
     var pendingReport by remember { mutableStateOf("") }
-    var pendingExcel by remember { mutableStateOf("") }
+    var pendingExcel by remember { mutableStateOf<FinanceData?>(null) }
     var filtersVisible by remember { mutableStateOf(false) }
     var search by remember { mutableStateOf("") }
     var reportType by remember { mutableStateOf("Overview") }
@@ -7441,9 +7459,9 @@ fun Reports(
         if (uri != null && pendingReport.isNotEmpty()) writePdfToUri(context, uri, pendingReport)
         pendingReport = ""
     }
-    val excelLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.ms-excel")) { uri ->
-        if (uri != null && pendingExcel.isNotEmpty()) writeExcelToUri(context, uri, pendingExcel)
-        pendingExcel = ""
+    val excelLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) { uri ->
+        if (uri != null && pendingExcel != null) writeXlsxToUri(context, uri, pendingExcel!!, period, reportType)
+        pendingExcel = null
     }
     fun inPeriod(value: Long): Boolean {
         val now = Calendar.getInstance()
@@ -7509,7 +7527,7 @@ fun Reports(
                 Button(onClick = { pendingReport = buildSummaryReport(filteredData, period, reportType); launcher.launch("Finance_Summary.pdf") }, enabled = matchCount > 0, modifier = Modifier.weight(1f)) { Text("Summary PDF") }
                 OutlinedButton(onClick = { pendingReport = buildCompleteReport(filteredData); launcher.launch("Finance_Detailed.pdf") }, enabled = matchCount > 0, modifier = Modifier.weight(1f)) { Text("Detailed PDF") }
             }
-            OutlinedButton(onClick = { pendingExcel = buildCompleteReport(filteredData); excelLauncher.launch("Filtered_Finance_Report.xls") }, enabled = matchCount > 0, modifier = Modifier.fillMaxWidth()) { Text("Filtered Excel") }
+            OutlinedButton(onClick = { pendingExcel = filteredData; excelLauncher.launch("Filtered_Finance_Report.xlsx") }, enabled = matchCount > 0, modifier = Modifier.fillMaxWidth()) { Text("Professional Excel (.xlsx)") }
         }
         reportResultSection("EMI", emis.map { "${it.name} • ${money(it.totalPayable)} • ${if (emiCompleted(it)) "Completed" else "Active"}" }, "EMI" in expanded) { expanded = if ("EMI" in expanded) expanded - "EMI" else expanded + "EMI" }
         reportResultSection("Loans", loans.map { "${it.name} • ${money(it.totalPayable)} • ${if (loanCompleted(it)) "Completed" else "Active"}" }, "Loans" in expanded) { expanded = if ("Loans" in expanded) expanded - "Loans" else expanded + "Loans" }
@@ -7946,15 +7964,68 @@ fun buildDebtReport(
 // PDF GENERATION
 // ============================================================
 
-fun writeExcelToUri(context: Context, uri: android.net.Uri, text: String) {
-    fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    val xml = buildString {
-        append("<?xml version=\"1.0\"?><Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\"><Worksheet ss:Name=\"Report\"><Table>")
-        val reportWithOwnership = text + "\n\nGenerated by My Finance Tracker\nCreated by Md. Zahid Alam"
-        reportWithOwnership.lines().forEach { line -> append("<Row><Cell><Data ss:Type=\"String\">${escape(line)}</Data></Cell></Row>") }
-        append("</Table></Worksheet></Workbook>")
+private data class XlsxMoney(val value: Double)
+private data class XlsxNumber(val value: Number)
+
+fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, period: String, reportType: String) {
+    fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+    fun columnName(index: Int): String {
+        var value = index + 1
+        var result = ""
+        while (value > 0) { value--; result = ('A'.code + value % 26).toChar() + result; value /= 26 }
+        return result
     }
-    context.contentResolver.openOutputStream(uri)?.use { it.write(xml.toByteArray()) }
+    fun sheet(headers: List<String>, rows: List<List<Any?>>): String = buildString {
+        append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">")
+        append("<sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews>")
+        append("<cols>"); headers.indices.forEach { index -> append("<col min=\"${index + 1}\" max=\"${index + 1}\" width=\"${when { headers[index].contains("Note") || headers[index].contains("Details") -> 28; headers[index].contains("Date") -> 15; else -> 20 }}\" customWidth=\"1\"/>") }; append("</cols><sheetData>")
+        fun row(number: Int, values: List<Any?>, header: Boolean = false) {
+            append("<row r=\"$number\">")
+            values.forEachIndexed { index, value ->
+                val ref = "${columnName(index)}$number"
+                when (value) {
+                    is XlsxMoney -> append("<c r=\"$ref\" s=\"2\"><v>${value.value}</v></c>")
+                    is XlsxNumber -> append("<c r=\"$ref\" s=\"3\"><v>${value.value}</v></c>")
+                    else -> append("<c r=\"$ref\" t=\"inlineStr\"${if (header) " s=\"1\"" else ""}><is><t xml:space=\"preserve\">${escape(value?.toString() ?: "")}</t></is></c>")
+                }
+            }
+            append("</row>")
+        }
+        row(1, headers, true); rows.forEachIndexed { index, values -> row(index + 2, values) }
+        append("</sheetData><autoFilter ref=\"A1:${columnName(headers.lastIndex)}${rows.size + 1}\"/><sheetFormatPr defaultRowHeight=\"18\"/></worksheet>")
+    }
+
+    val summaryRows = listOf(
+        listOf("Generated", dateTimeText(System.currentTimeMillis())), listOf("Period", period), listOf("Report type", reportType),
+        listOf("EMI plans", XlsxNumber(data.emis.size)), listOf("Loans", XlsxNumber(data.loans.size)),
+        listOf("Money I Owe", XlsxNumber(data.debts.count { it.direction == "I Owe" })), listOf("Money Owed to Me", XlsxNumber(data.debts.count { it.direction == "Owed to Me" })),
+        listOf("Expenses", XlsxNumber(data.expenses.size)), listOf("Expense total", XlsxMoney(data.expenses.sumOf { it.amount })),
+        listOf("Debt to pay", XlsxMoney(data.debts.filter { it.direction == "I Owe" }.sumOf { debtRemainingAmount(it) })),
+        listOf("Money to receive", XlsxMoney(data.debts.filter { it.direction == "Owed to Me" }.sumOf { debtRemainingAmount(it) }))
+    )
+    val sheets = listOf(
+        "Summary" to sheet(listOf("Metric", "Value"), summaryRows),
+        "EMI" to sheet(listOf("Item", "Category", "Seller", "Price", "Down Payment", "Financed", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.emis.map { listOf(it.name, it.category, it.seller, XlsxMoney(it.price), XlsxMoney(it.downPayment), XlsxMoney(it.financedAmount), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (emiCompleted(it)) "Completed" else "Active") }),
+        "Loans" to sheet(listOf("Loan", "Type", "Lender", "Principal", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.loans.map { listOf(it.name, it.type, it.lender, XlsxMoney(it.principal), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (loanCompleted(it)) "Completed" else "Active") }),
+        "Debts" to sheet(listOf("Person / Organization", "Direction", "Original", "Paid / Received", "Remaining", "Due Date", "Reason", "Reference", "Status"), data.debts.map { listOf(it.name, it.direction, XlsxMoney(it.originalAmount), XlsxMoney(debtPaidAmount(it)), XlsxMoney(debtRemainingAmount(it)), it.dueDate?.let { value -> dateText(value) } ?: "", it.reason, it.referenceNumber, if (it.archived) "Archived" else if (debtCompleted(it)) "Completed" else "Active") }),
+        "Expenses" to sheet(listOf("Date", "Expense", "Category", "Amount", "Notes"), data.expenses.map { listOf(expenseDayKey(it.date), it.title, it.category, XlsxMoney(it.amount), it.notes) }),
+        "Payments" to sheet(listOf("Record Type", "Record", "Payment No.", "Due Date", "Paid Date", "Amount", "Status", "Method", "Provider / Bank", "Reference", "Party", "Account", "Branch", "Routing", "Details", "Notes"), buildList {
+            data.emis.forEach { plan -> plan.payments.forEach { p -> add(listOf("EMI", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
+            data.loans.forEach { plan -> plan.payments.forEach { p -> add(listOf("Loan", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
+            data.debts.forEach { plan -> plan.payments.forEach { p -> add(listOf("Debt", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
+        })
+    )
+    context.contentResolver.openOutputStream(uri)?.use { output ->
+        ZipOutputStream(output).use { zip ->
+            fun entry(name: String, content: String) { zip.putNextEntry(ZipEntry(name)); zip.write(content.toByteArray(Charsets.UTF_8)); zip.closeEntry() }
+            entry("[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>${sheets.indices.joinToString("") { "<Override PartName=\"/xl/worksheets/sheet${it + 1}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>" }}</Types>")
+            entry("_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>")
+            entry("xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets>${sheets.mapIndexed { index, pair -> "<sheet name=\"${pair.first}\" sheetId=\"${index + 1}\" r:id=\"rId${index + 1}\"/>" }.joinToString("")}</sheets></workbook>")
+            entry("xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">${sheets.indices.joinToString("") { "<Relationship Id=\"rId${it + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet${it + 1}.xml\"/>" }}<Relationship Id=\"rId${sheets.size + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>")
+            entry("xl/styles.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"৳#,##0.00\"/></numFmts><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font><font><b/><color rgb=\"FFFFFFFF\"/><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF007C7A\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"4\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" applyFill=\"1\" applyFont=\"1\"/><xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs></styleSheet>")
+            sheets.forEachIndexed { index, pair -> entry("xl/worksheets/sheet${index + 1}.xml", pair.second) }
+        }
+    }
 }
 
 fun writePdfToUri(
