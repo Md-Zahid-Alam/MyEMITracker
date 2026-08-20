@@ -89,8 +89,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
+import androidx.compose.material3.Text as MaterialText
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -105,6 +106,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.VisualTransformation
@@ -145,6 +148,12 @@ private const val KEY_PASSWORD_HASH = "password_hash"
 private const val KEY_PASSWORD_SALT = "password_salt"
 private const val CHANNEL_ID = "finance_reminders"
 private const val KEY_THEME_MODE = "theme_mode"
+private const val KEY_LANGUAGE = "app_language"
+private const val KEY_COUNTRY = "payment_country"
+private const val KEY_CURRENCY_CODE = "currency_code"
+private const val KEY_CURRENCY_SYMBOL = "currency_symbol"
+private const val KEY_CUSTOM_BANKS = "custom_banks"
+private const val KEY_CUSTOM_PROVIDERS = "custom_providers"
 private const val LOCAL_KEY_ALIAS = "my_finance_tracker_records_v1"
 private const val BACKUP_FORMAT = "MFT_ENCRYPTED_BACKUP"
 
@@ -176,6 +185,97 @@ private val AppDarkColorScheme = darkColorScheme(
 )
 
 private val LocalFormReadOnly = staticCompositionLocalOf { false }
+private val LocalAppLanguage = staticCompositionLocalOf { "EN" }
+
+private object AppLocaleState {
+    var language: String = "EN"
+    var country: String = "Bangladesh"
+    var currencyCode: String = "BDT"
+    var currencySymbol: String = "৳"
+    var customBanks: List<String> = emptyList()
+    var customProviders: List<String> = emptyList()
+}
+
+private val BanglaText = mapOf(
+    "Home" to "হোম", "Payments" to "পেমেন্ট", "Expenses" to "খরচ", "Reports" to "রিপোর্ট", "Settings" to "সেটিংস",
+    "English" to "English", "Bangla" to "বাংলা", "Language" to "ভাষা", "Cancel" to "বাতিল", "Close" to "বন্ধ করুন",
+    "Save" to "সংরক্ষণ", "Edit" to "সম্পাদনা", "Delete" to "মুছুন", "Share" to "শেয়ার", "Search" to "খুঁজুন",
+    "Active" to "চলমান", "Completed" to "সম্পন্ন", "Archived" to "আর্কাইভ", "Paid" to "পরিশোধিত", "Pending" to "বাকি",
+    "Cancelled" to "বাতিল", "UNPAID" to "অপরিশোধিত", "PARTIALLY PAID" to "আংশিক পরিশোধিত", "PAID" to "পরিশোধিত", "CANCELLED" to "বাতিল",
+    "Money I Owe" to "আমার দেনা", "Money Owed to Me" to "আমার পাওনা", "Debts" to "দেনা-পাওনা", "Loans" to "ঋণ", "EMI Plans" to "ইএমআই পরিকল্পনা",
+    "Payment History" to "পেমেন্টের ইতিহাস", "Plan Information" to "পরিকল্পনার তথ্য", "Documents" to "ডকুমেন্ট", "Financing Information" to "অর্থায়নের তথ্য",
+    "Record Payment" to "পেমেন্ট লিখুন", "Record Received Amount" to "প্রাপ্ত টাকা লিখুন", "Create Payment Request" to "পেমেন্ট অনুরোধ তৈরি করুন",
+    "Save PDF" to "PDF সংরক্ষণ", "Summary PDF" to "সারাংশ PDF", "Detailed PDF" to "বিস্তারিত PDF", "Professional Excel (.xlsx)" to "প্রফেশনাল Excel (.xlsx)",
+    "Report type" to "রিপোর্টের ধরন", "Report period" to "রিপোর্টের সময়কাল", "Status" to "অবস্থা", "Sort" to "সাজান", "Clear Filters" to "ফিল্টার মুছুন",
+    "This month" to "এই মাস", "Last month" to "গত মাস", "Custom range" to "নিজস্ব সময়সীমা", "All time" to "সব সময়",
+    "Overview" to "সারসংক্ষেপ", "All statuses" to "সব অবস্থা", "Newest first" to "নতুন আগে", "Oldest first" to "পুরোনো আগে", "Highest amount" to "বেশি টাকা আগে", "Lowest amount" to "কম টাকা আগে",
+    "Payment method" to "পেমেন্ট পদ্ধতি", "Preferred payment method" to "পছন্দের পেমেন্ট পদ্ধতি", "Mobile banking" to "মোবাইল ব্যাংকিং", "Bank transfer" to "ব্যাংক ট্রান্সফার",
+    "Cash" to "নগদ", "Cheque" to "চেক", "Card" to "কার্ড", "Other" to "অন্যান্য", "Bank name" to "ব্যাংকের নাম", "Select Bank" to "ব্যাংক নির্বাচন করুন",
+    "Account holder" to "হিসাবধারীর নাম", "Account number" to "হিসাব নম্বর", "Branch (optional)" to "শাখা (ঐচ্ছিক)", "Routing number (optional)" to "রাউটিং নম্বর (ঐচ্ছিক)",
+    "Transaction / reference ID" to "লেনদেন / রেফারেন্স আইডি", "Mobile banking provider" to "মোবাইল ব্যাংকিং সেবা", "Phone (optional)" to "ফোন (ঐচ্ছিক)", "Email (optional)" to "ইমেইল (ঐচ্ছিক)",
+    "Address (optional)" to "ঠিকানা (ঐচ্ছিক)", "Full name" to "পূর্ণ নাম", "Receipt Profile" to "রসিদ প্রোফাইল", "Change Password" to "পাসওয়ার্ড পরিবর্তন",
+    "Unlock" to "আনলক", "Password" to "পাসওয়ার্ড", "Theme" to "থিম", "Light" to "লাইট", "Dark" to "ডার্ক", "System default" to "সিস্টেম ডিফল্ট",
+    "Add Expense" to "খরচ যোগ করুন", "Edit Expense" to "খরচ সম্পাদনা", "Expense name *" to "খরচের নাম *", "Amount *" to "পরিমাণ *", "Date *" to "তারিখ *", "Notes (optional)" to "নোট (ঐচ্ছিক)",
+    "Daily" to "দৈনিক", "Monthly" to "মাসিক", "Category filter" to "ক্যাটাগরি ফিল্টার", "View category summary" to "ক্যাটাগরি সারাংশ দেখুন",
+    "Back" to "ফিরুন", "Continue" to "চালিয়ে যান", "Confirm" to "নিশ্চিত করুন", "Update" to "আপডেট", "Restore" to "ফিরিয়ে আনুন", "Reopen" to "পুনরায় খুলুন", "Archive" to "আর্কাইভ",
+    "Summary" to "সারাংশ", "EMI" to "ইএমআই", "Expenses" to "খরচসমূহ", "Metric" to "বিষয়", "Value" to "মান",
+    "Date" to "তারিখ", "Amount" to "পরিমাণ", "Notes" to "নোট", "Category" to "ক্যাটাগরি", "Direction" to "ধরন",
+    "Generated" to "তৈরির সময়", "Period" to "সময়কাল", "Report type" to "রিপোর্টের ধরন", "Status" to "অবস্থা",
+    "PAYMENT RECEIPT" to "পেমেন্ট রসিদ", "PAYMENT REQUEST" to "পেমেন্ট অনুরোধ", "SUMMARY REPORT" to "সারাংশ রিপোর্ট", "COMPLETE REPORT" to "সম্পূর্ণ রিপোর্ট",
+    "MY FINANCE TRACKER" to "মাই ফাইন্যান্স ট্র্যাকার", "Secure personal finance record" to "নিরাপদ ব্যক্তিগত আর্থিক রেকর্ড",
+    "Authorized signature" to "অনুমোদিত স্বাক্ষর", "Generated by My Finance Tracker • Powered by Md. Zahid Alam" to "My Finance Tracker দ্বারা তৈরি • Powered by Md. Zahid Alam",
+    "Language and region" to "ভাষা ও অঞ্চল", "Country" to "দেশ", "Bangladesh" to "বাংলাদেশ", "Other country" to "অন্যান্য দেশ",
+    "Country name" to "দেশের নাম", "Currency code (for example USD)" to "মুদ্রা কোড (যেমন USD)", "Currency symbol" to "মুদ্রার প্রতীক",
+    "Apply country and currency" to "দেশ ও মুদ্রা প্রয়োগ করুন", "My payment institutions" to "আমার পেমেন্ট প্রতিষ্ঠান",
+    "Add bank" to "ব্যাংক যোগ করুন", "Add mobile banking provider" to "মোবাইল ব্যাংকিং সেবা যোগ করুন", "Add provider" to "সেবা যোগ করুন",
+    "Security and local data tools" to "নিরাপত্তা ও স্থানীয় ডেটা টুল", "Appearance" to "চেহারা", "Lock App" to "অ্যাপ লক করুন",
+    "Export Encrypted Backup" to "এনক্রিপ্টেড ব্যাকআপ রপ্তানি", "Restore Backup" to "ব্যাকআপ পুনরুদ্ধার", "About My Finance Tracker" to "My Finance Tracker সম্পর্কে",
+    "Secure My Finance Tracker" to "My Finance Tracker সুরক্ষিত করুন", "Confirm password" to "পাসওয়ার্ড নিশ্চিত করুন", "Create Password" to "পাসওয়ার্ড তৈরি করুন",
+    "Add EMI" to "ইএমআই যোগ করুন", "Edit EMI" to "ইএমআই সম্পাদনা", "EMI Details" to "ইএমআই বিস্তারিত", "Add Loan" to "ঋণ যোগ করুন", "Edit Loan" to "ঋণ সম্পাদনা", "Loan Details" to "ঋণের বিস্তারিত",
+    "Add Debt" to "দেনা-পাওনা যোগ করুন", "Edit Debt" to "দেনা-পাওনা সম্পাদনা", "Debt Details" to "দেনা-পাওনার বিস্তারিত",
+    "Item name" to "পণ্যের নাম", "Seller / Provider" to "বিক্রেতা / সেবাদাতা", "Purchase price" to "ক্রয়মূল্য", "Down payment" to "ডাউন পেমেন্ট",
+    "Interest rate % (optional)" to "সুদের হার % (ঐচ্ছিক)", "Fixed interest amount (optional)" to "নির্দিষ্ট সুদের পরিমাণ (ঐচ্ছিক)", "Number of installments" to "কিস্তির সংখ্যা",
+    "Loan name" to "ঋণের নাম", "Lender" to "ঋণদাতা", "Principal amount" to "মূল ঋণের পরিমাণ", "Person / Organization" to "ব্যক্তি / প্রতিষ্ঠান",
+    "Original amount" to "মূল পরিমাণ", "Due date" to "পরিশোধের তারিখ", "Reason / purpose" to "কারণ / উদ্দেশ্য", "Reference (optional)" to "রেফারেন্স (ঐচ্ছিক)",
+    "No bank found." to "কোনো ব্যাংক পাওয়া যায়নি।", "Search bank" to "ব্যাংক খুঁজুন", "Other bank" to "অন্যান্য ব্যাংক", "Other provider" to "অন্যান্য সেবা",
+    "Mobile / account number" to "মোবাইল / হিসাব নম্বর", "Transaction ID" to "লেনদেন আইডি", "Account holder (optional)" to "হিসাবধারী (ঐচ্ছিক)",
+    "Change country and currency?" to "দেশ ও মুদ্রা পরিবর্তন করবেন?", "Change" to "পরিবর্তন করুন"
+)
+
+private fun localized(value: String, language: String = AppLocaleState.language): String {
+    if (language != "BN") return value
+    BanglaText[value]?.let { return it }
+    var result = value
+    listOf(
+        "Remaining" to "বাকি", "Total" to "মোট", "Paid" to "পরিশোধিত", "Received" to "প্রাপ্ত", "Due" to "বকেয়ার তারিখ",
+        "No records" to "কোনো রেকর্ড নেই", "Payment" to "পেমেন্ট", "Expense" to "খরচ", "Loan" to "ঋণ", "Debt" to "দেনা",
+        "Save" to "সংরক্ষণ", "Open" to "খুলুন", "Search" to "খুঁজুন", "Select" to "নির্বাচন", "Delete" to "মুছুন"
+    ).forEach { (english, bangla) -> result = result.replace(english, bangla, ignoreCase = false) }
+    return result
+}
+
+private fun localizedExport(value: String): String {
+    if (AppLocaleState.language != "BN") return value
+    val trimmed = value.trim()
+    if (trimmed.contains(":")) {
+        val label = trimmed.substringBefore(":")
+        return localized(label) + ":" + trimmed.substringAfter(":")
+    }
+    return localized(trimmed)
+}
+
+@Composable
+fun Text(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    fontSize: TextUnit = TextUnit.Unspecified,
+    fontWeight: FontWeight? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    style: TextStyle = TextStyle.Default
+) {
+    MaterialText(localized(text, LocalAppLanguage.current), modifier, color, fontSize, fontWeight = fontWeight, maxLines = maxLines, style = style)
+}
 
 
 // ============================================================
@@ -356,7 +456,7 @@ fun ConfirmationDialog(
 // ============================================================
 
 fun money(value: Double): String {
-    return "৳" + NumberFormat.getNumberInstance(Locale.US).format(value)
+    return AppLocaleState.currencySymbol + NumberFormat.getNumberInstance(Locale.US).format(value)
 }
 
 fun dateText(value: Long): String {
@@ -2145,7 +2245,14 @@ fun FinanceApp(
     onPasswordChange: (String) -> Unit,
     verifyPassword: (String) -> Boolean,
     themeMode: String,
-    onThemeChange: (String) -> Unit
+    onThemeChange: (String) -> Unit,
+    language: String,
+    onLanguageChange: (String) -> Unit,
+    country: String,
+    currencyCode: String,
+    currencySymbol: String,
+    onRegionChange: (String, String, String) -> Unit,
+    onCustomPaymentListsChange: (List<String>, List<String>) -> Unit
 ) {
 
     val context =
@@ -2515,7 +2622,14 @@ fun FinanceApp(
                     onAbout = { selectedType = "about" },
                     onReceiptProfile = { selectedType = "receipt_profile" },
                     themeMode = themeMode,
-                    onThemeChange = onThemeChange
+                    onThemeChange = onThemeChange,
+                    language = language,
+                    onLanguageChange = onLanguageChange,
+                    country = country,
+                    currencyCode = currencyCode,
+                    currencySymbol = currencySymbol,
+                    onRegionChange = onRegionChange,
+                    onCustomPaymentListsChange = onCustomPaymentListsChange
                 )
             }
         }
@@ -2992,11 +3106,11 @@ private fun DebtPaymentEntry(viewModel: FinanceViewModel, debt: Debt, onSaved: (
             selectedRequest != null && value > (selectedRequest.amount - selectedRequest.receivedAmount) + 0.005 -> "Amount cannot exceed this request's outstanding balance."
             date == null -> "Select a valid payment date."
             date > System.currentTimeMillis() -> "Payment date cannot be in the future."
-            paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, reference, methodDetails).isNotBlank() -> paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, reference, methodDetails)
+            paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") defaultProvider() else if (method == "Bank transfer" || method == "Cheque") defaultBank() else "" }, accountName, accountNumber, reference, methodDetails).isNotBlank() -> paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") defaultProvider() else if (method == "Bank transfer" || method == "Cheque") defaultBank() else "" }, accountName, accountNumber, reference, methodDetails)
             else -> ""
         }
         if (error.isBlank() && date != null) {
-            viewModel.markDebtPaid(debt.id, value, paidDate = date, method = method, channel = channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, reference = reference.trim(), counterparty = accountName.trim(), notes = notes.trim(), attachments = attachments, requestId = selectedRequest?.id ?: "", accountNumber = accountNumber.trim(), branch = branch.trim(), routingNumber = routingNumber.trim(), methodDetails = methodDetails.trim())
+            viewModel.markDebtPaid(debt.id, value, paidDate = date, method = method, channel = channel.ifBlank { if (method == "Mobile banking") defaultProvider() else if (method == "Bank transfer" || method == "Cheque") defaultBank() else "" }, reference = reference.trim(), counterparty = accountName.trim(), notes = notes.trim(), attachments = attachments, requestId = selectedRequest?.id ?: "", accountNumber = accountNumber.trim(), branch = branch.trim(), routingNumber = routingNumber.trim(), methodDetails = methodDetails.trim())
             onSaved()
         }
     }, modifier = Modifier.fillMaxWidth()) { Text(if (debt.direction == "Owed to Me") "Save Received Amount" else "Save Payment") }
@@ -4852,8 +4966,8 @@ fun PaymentEditDialog(
                         error = "Paid date cannot be in the future."
                     } else if (parsedPaidDate != null && paymentMethod == "Not recorded") {
                         error = "Select how this payment was made."
-                    } else if (parsedPaidDate != null && paymentMethodValidation(paymentMethod, paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") "bKash" else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") BangladeshBanks.first() else "" }, counterparty, accountNumber, referenceNumber, methodDetails).isNotBlank()) {
-                        error = paymentMethodValidation(paymentMethod, paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") "bKash" else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") BangladeshBanks.first() else "" }, counterparty, accountNumber, referenceNumber, methodDetails)
+                    } else if (parsedPaidDate != null && paymentMethodValidation(paymentMethod, paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") defaultProvider() else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") defaultBank() else "" }, counterparty, accountNumber, referenceNumber, methodDetails).isNotBlank()) {
+                        error = paymentMethodValidation(paymentMethod, paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") defaultProvider() else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") defaultBank() else "" }, counterparty, accountNumber, referenceNumber, methodDetails)
                     } else if (notes.length > 500 || referenceNumber.length > 100 || counterparty.length > 100) {
                         error = "Notes must be 500 characters or less; reference and party names must be 100 or less."
                     } else {
@@ -4863,7 +4977,7 @@ fun PaymentEditDialog(
                                 paidDate = parsedPaidDate,
                                 notes = notes.trim(),
                                 paymentMethod = paymentMethod,
-                                paymentChannel = paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") "bKash" else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") BangladeshBanks.first() else "" },
+                                paymentChannel = paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") defaultProvider() else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") defaultBank() else "" },
                                 referenceNumber = referenceNumber.trim(),
                                 counterparty = counterparty.trim(),
                                 attachments = attachments,
@@ -6274,7 +6388,7 @@ fun DebtForm(
                 listOf("Cash", "Bank transfer", "Mobile banking", "Salary deduction", "Card", "Cheque", "Other")
             ) { paymentMethod = it }
             if (paymentMethod == "Mobile banking") {
-                ChoiceDropdown("Mobile banking provider", paymentChannel.ifBlank { "bKash" }, listOf("bKash", "Nagad", "Rocket", "Other")) { paymentChannel = it }
+                ChoiceDropdown("Mobile banking provider", paymentChannel.ifBlank { defaultProvider() }, availableProviders()) { paymentChannel = it }
             } else if (paymentMethod == "Bank transfer" || paymentMethod == "Salary deduction") {
                 Field(if (paymentMethod == "Bank transfer") "Bank name" else "Employer / salary month", paymentChannel) { paymentChannel = it }
             }
@@ -6586,7 +6700,7 @@ fun PaymentRequestDialog(debt: Debt, existing: PaymentRequest? = null, onSave: (
                     parsedDue == null -> "Enter a valid due date."
                     parsedDue < Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis -> "Due date cannot be in the past."
                     method in listOf("Bank transfer", "Mobile banking") && instructions.isBlank() -> "Enter payment instructions for the selected method."
-                    paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, referenceNumber, methodDetails).isNotBlank() -> paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, referenceNumber, methodDetails)
+                    paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") defaultProvider() else if (method == "Bank transfer" || method == "Cheque") defaultBank() else "" }, accountName, accountNumber, referenceNumber, methodDetails).isNotBlank() -> paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") defaultProvider() else if (method == "Bank transfer" || method == "Cheque") defaultBank() else "" }, accountName, accountNumber, referenceNumber, methodDetails)
                     instructions.length > 300 || message.length > 500 -> "Instructions must be 300 characters or less and message 500 or less."
                     else -> ""
                 }
@@ -6604,7 +6718,7 @@ fun PaymentRequestDialog(debt: Debt, existing: PaymentRequest? = null, onSave: (
                             message = message.trim(),
                             status = existing?.status ?: "UNPAID",
                             receivedAmount = existing?.receivedAmount ?: 0.0,
-                            paymentChannel = channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" },
+                            paymentChannel = channel.ifBlank { if (method == "Mobile banking") defaultProvider() else if (method == "Bank transfer" || method == "Cheque") defaultBank() else "" },
                             accountName = accountName.trim(),
                             accountNumber = accountNumber.trim(),
                             branch = branch.trim(),
@@ -6871,10 +6985,56 @@ fun SettingsScreen(
     onAbout: () -> Unit,
     onReceiptProfile: () -> Unit,
     themeMode: String,
-    onThemeChange: (String) -> Unit
+    onThemeChange: (String) -> Unit,
+    language: String,
+    onLanguageChange: (String) -> Unit,
+    country: String,
+    currencyCode: String,
+    currencySymbol: String,
+    onRegionChange: (String, String, String) -> Unit,
+    onCustomPaymentListsChange: (List<String>, List<String>) -> Unit
 ) {
+    var selectedCountry by remember(country) { mutableStateOf(if (country == "Bangladesh") "Bangladesh" else "Other country") }
+    var customCountry by remember(country) { mutableStateOf(if (country == "Bangladesh") "" else country) }
+    var draftCurrencyCode by remember(currencyCode) { mutableStateOf(currencyCode) }
+    var draftCurrencySymbol by remember(currencySymbol) { mutableStateOf(currencySymbol) }
+    var customBanks by remember { mutableStateOf(AppLocaleState.customBanks) }
+    var customProviders by remember { mutableStateOf(AppLocaleState.customProviders) }
+    var newBank by remember { mutableStateOf("") }
+    var newProvider by remember { mutableStateOf("") }
+    var showRegionWarning by remember { mutableStateOf(false) }
+
     FormColumn("Settings") {
         Text("Security and local data tools")
+
+        Text("Language and region", fontWeight = FontWeight.Bold)
+        ChoiceDropdown("Language", if (language == "BN") "Bangla" else "English", listOf("English", "Bangla")) {
+            onLanguageChange(if (it == "Bangla") "BN" else "EN")
+        }
+        ChoiceDropdown("Country", selectedCountry, listOf("Bangladesh", "Other country")) {
+            selectedCountry = it
+            if (it == "Bangladesh") { draftCurrencyCode = "BDT"; draftCurrencySymbol = "৳" }
+        }
+        if (selectedCountry == "Other country") {
+            Field("Country name", customCountry) { customCountry = it }
+            Field("Currency code (for example USD)", draftCurrencyCode) { draftCurrencyCode = it.uppercase().take(3) }
+            Field("Currency symbol", draftCurrencySymbol) { draftCurrencySymbol = it.take(4) }
+        }
+        OutlinedButton(onClick = { showRegionWarning = true }, modifier = Modifier.fillMaxWidth()) { Text("Apply country and currency") }
+        Text("Changing currency changes the displayed symbol only; existing amounts are not converted.", style = MaterialTheme.typography.bodySmall)
+
+        Text("My payment institutions", fontWeight = FontWeight.Bold)
+        Text(if (selectedCountry == "Bangladesh") "Bangladesh banks and mobile banking services are already included. Add any extra services below." else "Add only the banks and payment services you use. They stay on this device.")
+        Field("Add bank", newBank) { newBank = it }
+        OutlinedButton(onClick = {
+            val value = newBank.trim(); if (value.isNotBlank() && customBanks.none { it.equals(value, true) }) { customBanks = customBanks + value; newBank = ""; onCustomPaymentListsChange(customBanks, customProviders) }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Add bank") }
+        customBanks.forEach { bank -> TextButton(onClick = { customBanks = customBanks - bank; onCustomPaymentListsChange(customBanks, customProviders) }) { Text("$bank  •  Remove") } }
+        Field("Add mobile banking provider", newProvider) { newProvider = it }
+        OutlinedButton(onClick = {
+            val value = newProvider.trim(); if (value.isNotBlank() && customProviders.none { it.equals(value, true) }) { customProviders = customProviders + value; newProvider = ""; onCustomPaymentListsChange(customBanks, customProviders) }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Add provider") }
+        customProviders.forEach { provider -> TextButton(onClick = { customProviders = customProviders - provider; onCustomPaymentListsChange(customBanks, customProviders) }) { Text("$provider  •  Remove") } }
 
         Text("Appearance", fontWeight = FontWeight.Bold)
         ChoiceDropdown(
@@ -6947,6 +7107,18 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall
         )
     }
+    if (showRegionWarning) ConfirmationDialog(
+        request = ConfirmationRequest(
+            title = "Change country and currency?",
+            message = "Existing money values will not be converted. Only the country, currency code, symbol, and available payment choices will change.",
+            confirmLabel = "Change",
+            onConfirm = {
+                val finalCountry = if (selectedCountry == "Bangladesh") "Bangladesh" else customCountry.trim()
+                if (finalCountry.isNotBlank() && draftCurrencyCode.length == 3 && draftCurrencySymbol.isNotBlank()) onRegionChange(finalCountry, draftCurrencyCode, draftCurrencySymbol)
+            }
+        ),
+        onDismiss = { showRegionWarning = false }
+    )
 }
 
 @Composable
@@ -7115,15 +7287,26 @@ private val BangladeshBanks = listOf(
     "Community Bank Bangladesh", "Other bank"
 )
 
+private fun availableBanks(): List<String> =
+    if (AppLocaleState.country == "Bangladesh") (BangladeshBanks + AppLocaleState.customBanks).distinct()
+    else (AppLocaleState.customBanks + "Other bank").distinct()
+
+private fun availableProviders(): List<String> =
+    if (AppLocaleState.country == "Bangladesh") (listOf("bKash", "Nagad", "Rocket", "Upay") + AppLocaleState.customProviders + "Other provider").distinct()
+    else (AppLocaleState.customProviders + "Other provider").distinct()
+
+private fun defaultBank() = availableBanks().firstOrNull() ?: "Other bank"
+private fun defaultProvider() = availableProviders().firstOrNull() ?: "Other provider"
+
 @Composable
 private fun SearchableBankPicker(value: String, onSelect: (String) -> Unit) {
     var visible by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     OutlinedButton(onClick = { visible = true }, modifier = Modifier.fillMaxWidth()) {
-        Text("Bank name: ${value.ifBlank { BangladeshBanks.first() }}")
+        Text("Bank name: ${value.ifBlank { defaultBank() }}")
     }
     if (visible) {
-        val matches = BangladeshBanks.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) }
+        val matches = availableBanks().filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) }
         AlertDialog(
             onDismissRequest = { visible = false },
             title = { Text("Select Bank") },
@@ -7163,14 +7346,14 @@ fun PaymentMethodDetailsFields(
 ) {
     when (method) {
         "Mobile banking" -> {
-            ChoiceDropdown("Mobile banking provider", channel.ifBlank { "bKash" }, listOf("bKash", "Nagad", "Rocket", "Upay", "Other provider"), onChannel)
+            ChoiceDropdown("Mobile banking provider", channel.ifBlank { defaultProvider() }, availableProviders(), onChannel)
             if (channel == "Other provider") Field("Provider name", methodDetails, onChange = onMethodDetails)
             Field("Mobile / account number", accountNumber, onChange = onAccountNumber)
             Field("Account holder (optional)", accountName, onChange = onAccountName)
             Field("Transaction ID", reference, onChange = onReference)
         }
         "Bank transfer" -> {
-            SearchableBankPicker(channel.ifBlank { BangladeshBanks.first() }, onChannel)
+            SearchableBankPicker(channel.ifBlank { defaultBank() }, onChannel)
             if (channel == "Other bank") Field("Other bank name", methodDetails, onChange = onMethodDetails)
             Field("Account holder", accountName, onChange = onAccountName)
             Field("Account number", accountNumber, onChange = onAccountNumber)
@@ -7179,7 +7362,7 @@ fun PaymentMethodDetailsFields(
             Field("Transaction / reference ID", reference, onChange = onReference)
         }
         "Cheque" -> {
-            SearchableBankPicker(channel.ifBlank { BangladeshBanks.first() }, onChannel)
+            SearchableBankPicker(channel.ifBlank { defaultBank() }, onChannel)
             if (channel == "Other bank") Field("Other bank name", methodDetails, onChange = onMethodDetails)
             Field("Cheque number", reference, onChange = onReference)
             Field("Account holder (optional)", accountName, onChange = onAccountName)
@@ -7986,7 +8169,7 @@ fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, pe
                 when (value) {
                     is XlsxMoney -> append("<c r=\"$ref\" s=\"2\"><v>${value.value}</v></c>")
                     is XlsxNumber -> append("<c r=\"$ref\" s=\"3\"><v>${value.value}</v></c>")
-                    else -> append("<c r=\"$ref\" t=\"inlineStr\"${if (header) " s=\"1\"" else ""}><is><t xml:space=\"preserve\">${escape(value?.toString() ?: "")}</t></is></c>")
+                    else -> append("<c r=\"$ref\" t=\"inlineStr\"${if (header) " s=\"1\"" else ""}><is><t xml:space=\"preserve\">${escape(localized(value?.toString() ?: ""))}</t></is></c>")
                 }
             }
             append("</row>")
@@ -8004,12 +8187,12 @@ fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, pe
         listOf("Money to receive", XlsxMoney(data.debts.filter { it.direction == "Owed to Me" }.sumOf { debtRemainingAmount(it) }))
     )
     val sheets = listOf(
-        "Summary" to sheet(listOf("Metric", "Value"), summaryRows),
-        "EMI" to sheet(listOf("Item", "Category", "Seller", "Price", "Down Payment", "Financed", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.emis.map { listOf(it.name, it.category, it.seller, XlsxMoney(it.price), XlsxMoney(it.downPayment), XlsxMoney(it.financedAmount), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (emiCompleted(it)) "Completed" else "Active") }),
-        "Loans" to sheet(listOf("Loan", "Type", "Lender", "Principal", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.loans.map { listOf(it.name, it.type, it.lender, XlsxMoney(it.principal), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (loanCompleted(it)) "Completed" else "Active") }),
-        "Debts" to sheet(listOf("Person / Organization", "Direction", "Original", "Paid / Received", "Remaining", "Due Date", "Reason", "Reference", "Status"), data.debts.map { listOf(it.name, it.direction, XlsxMoney(it.originalAmount), XlsxMoney(debtPaidAmount(it)), XlsxMoney(debtRemainingAmount(it)), it.dueDate?.let { value -> dateText(value) } ?: "", it.reason, it.referenceNumber, if (it.archived) "Archived" else if (debtCompleted(it)) "Completed" else "Active") }),
-        "Expenses" to sheet(listOf("Date", "Expense", "Category", "Amount", "Notes"), data.expenses.map { listOf(expenseDayKey(it.date), it.title, it.category, XlsxMoney(it.amount), it.notes) }),
-        "Payments" to sheet(listOf("Record Type", "Record", "Payment No.", "Due Date", "Paid Date", "Amount", "Status", "Method", "Provider / Bank", "Reference", "Party", "Account", "Branch", "Routing", "Details", "Notes"), buildList {
+        localized("Summary") to sheet(listOf("Metric", "Value"), summaryRows),
+        localized("EMI") to sheet(listOf("Item", "Category", "Seller", "Price", "Down Payment", "Financed", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.emis.map { listOf(it.name, it.category, it.seller, XlsxMoney(it.price), XlsxMoney(it.downPayment), XlsxMoney(it.financedAmount), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (emiCompleted(it)) "Completed" else "Active") }),
+        localized("Loans") to sheet(listOf("Loan", "Type", "Lender", "Principal", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.loans.map { listOf(it.name, it.type, it.lender, XlsxMoney(it.principal), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (loanCompleted(it)) "Completed" else "Active") }),
+        localized("Debts") to sheet(listOf("Person / Organization", "Direction", "Original", "Paid / Received", "Remaining", "Due Date", "Reason", "Reference", "Status"), data.debts.map { listOf(it.name, it.direction, XlsxMoney(it.originalAmount), XlsxMoney(debtPaidAmount(it)), XlsxMoney(debtRemainingAmount(it)), it.dueDate?.let { value -> dateText(value) } ?: "", it.reason, it.referenceNumber, if (it.archived) "Archived" else if (debtCompleted(it)) "Completed" else "Active") }),
+        localized("Expenses") to sheet(listOf("Date", "Expense", "Category", "Amount", "Notes"), data.expenses.map { listOf(expenseDayKey(it.date), it.title, it.category, XlsxMoney(it.amount), it.notes) }),
+        localized("Payments") to sheet(listOf("Record Type", "Record", "Payment No.", "Due Date", "Paid Date", "Amount", "Status", "Method", "Provider / Bank", "Reference", "Party", "Account", "Branch", "Routing", "Details", "Notes"), buildList {
             data.emis.forEach { plan -> plan.payments.forEach { p -> add(listOf("EMI", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
             data.loans.forEach { plan -> plan.payments.forEach { p -> add(listOf("Loan", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
             data.debts.forEach { plan -> plan.payments.forEach { p -> add(listOf("Debt", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
@@ -8022,7 +8205,7 @@ fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, pe
             entry("_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>")
             entry("xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets>${sheets.mapIndexed { index, pair -> "<sheet name=\"${pair.first}\" sheetId=\"${index + 1}\" r:id=\"rId${index + 1}\"/>" }.joinToString("")}</sheets></workbook>")
             entry("xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">${sheets.indices.joinToString("") { "<Relationship Id=\"rId${it + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet${it + 1}.xml\"/>" }}<Relationship Id=\"rId${sheets.size + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>")
-            entry("xl/styles.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"৳#,##0.00\"/></numFmts><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font><font><b/><color rgb=\"FFFFFFFF\"/><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF007C7A\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"4\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" applyFill=\"1\" applyFont=\"1\"/><xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs></styleSheet>")
+            entry("xl/styles.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"1\"><numFmt numFmtId=\"164\" formatCode=\"${escape(AppLocaleState.currencySymbol)}#,##0.00\"/></numFmts><fonts count=\"2\"><font><sz val=\"11\"/><name val=\"Calibri\"/></font><font><b/><color rgb=\"FFFFFFFF\"/><sz val=\"11\"/><name val=\"Calibri\"/></font></fonts><fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF007C7A\"/><bgColor indexed=\"64\"/></patternFill></fill></fills><borders count=\"1\"><border/></borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"4\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"0\" applyFill=\"1\" applyFont=\"1\"/><xf numFmtId=\"164\" fontId=\"0\" fillId=\"0\" borderId=\"0\" applyNumberFormat=\"1\"/><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellXfs></styleSheet>")
             sheets.forEachIndexed { index, pair -> entry("xl/worksheets/sheet${index + 1}.xml", pair.second) }
         }
     }
@@ -8069,10 +8252,10 @@ fun writePdfToUri(
                 paint.color = android.graphics.Color.WHITE
                 paint.textSize = 18f
                 paint.isFakeBoldText = true
-                canvas.drawText("MY FINANCE TRACKER", 112f, 49f, paint)
+                canvas.drawText(localized("MY FINANCE TRACKER"), 112f, 49f, paint)
                 paint.textSize = 10f
                 paint.isFakeBoldText = false
-                canvas.drawText("Secure personal finance record", 112f, 69f, paint)
+                canvas.drawText(localized("Secure personal finance record"), 112f, 69f, paint)
             }
             fun wrap(value: String, maxChars: Int = 76): List<String> {
                 if (value.length <= maxChars) return listOf(value)
@@ -8087,7 +8270,7 @@ fun writePdfToUri(
             }
             drawHeader()
             var y = 132f
-            val inputLines = text.lines().dropWhile { it.equals("MY FINANCE TRACKER", true) }
+            val inputLines = text.lines().dropWhile { it.equals("MY FINANCE TRACKER", true) }.map(::localizedExport)
             inputLines.forEach { raw ->
                 val line = raw.trim()
                 if (y > 785f) {
@@ -8109,7 +8292,7 @@ fun writePdfToUri(
                         }.getOrNull()
                         if (signature != null) {
                             paint.color = muted; paint.textSize = 10f; paint.isFakeBoldText = true
-                            canvas.drawText("Authorized signature", 40f, y, paint)
+                            canvas.drawText(localized("Authorized signature"), 40f, y, paint)
                             val ratio = signature.width.toFloat() / signature.height.coerceAtLeast(1)
                             val height = 58f
                             val width = minOf(170f, height * ratio)
@@ -8146,7 +8329,7 @@ fun writePdfToUri(
             }
             paint.color = paleTeal; canvas.drawRect(0f, 796f, 595f, 842f, paint)
             paint.color = teal; paint.textSize = 9f; paint.isFakeBoldText = true
-            canvas.drawText("Generated by My Finance Tracker • Powered by Md. Zahid Alam", 30f, 822f, paint)
+            canvas.drawText(localized("Generated by My Finance Tracker • Powered by Md. Zahid Alam"), 30f, 822f, paint)
 
             document.finishPage(
                 page
@@ -8203,21 +8386,30 @@ class MainActivity : ComponentActivity() {
             var themeMode by remember {
                 mutableStateOf(preferences.getString(KEY_THEME_MODE, "SYSTEM") ?: "SYSTEM")
             }
+            var language by remember { mutableStateOf(preferences.getString(KEY_LANGUAGE, "EN") ?: "EN") }
+            var country by remember { mutableStateOf(preferences.getString(KEY_COUNTRY, "Bangladesh") ?: "Bangladesh") }
+            var currencyCode by remember { mutableStateOf(preferences.getString(KEY_CURRENCY_CODE, "BDT") ?: "BDT") }
+            var currencySymbol by remember { mutableStateOf(preferences.getString(KEY_CURRENCY_SYMBOL, "৳") ?: "৳") }
+            AppLocaleState.language = language; AppLocaleState.country = country; AppLocaleState.currencyCode = currencyCode; AppLocaleState.currencySymbol = currencySymbol
+            AppLocaleState.customBanks = preferences.getStringSet(KEY_CUSTOM_BANKS, emptySet())?.sorted() ?: emptyList()
+            AppLocaleState.customProviders = preferences.getStringSet(KEY_CUSTOM_PROVIDERS, emptySet())?.sorted() ?: emptyList()
             val useDarkTheme = when (themeMode) {
                 "LIGHT" -> false
                 "DARK" -> true
                 else -> isSystemInDarkTheme()
             }
 
-            MaterialTheme(
+            CompositionLocalProvider(LocalAppLanguage provides language) { MaterialTheme(
                 colorScheme = if (useDarkTheme) AppDarkColorScheme else AppLightColorScheme
             ) {
 
             if (!security.hasPassword()) {
 
-                SetupScreen {
+                SetupScreen(language = language, onLanguageChange = { selected -> language = selected; preferences.edit().putString(KEY_LANGUAGE, selected).apply() }) { password, selectedCountry, code, symbol ->
 
-                    security.setPassword(it)
+                    security.setPassword(password)
+                    country = selectedCountry; currencyCode = code; currencySymbol = symbol
+                    preferences.edit().putString(KEY_COUNTRY, selectedCountry).putString(KEY_CURRENCY_CODE, code).putString(KEY_CURRENCY_SYMBOL, symbol).apply()
 
                     unlocked = true
 
@@ -8226,7 +8418,7 @@ class MainActivity : ComponentActivity() {
 
             } else if (!unlocked) {
 
-                LockScreen { password ->
+                LockScreen(language = language, onLanguageChange = { selected -> language = selected; preferences.edit().putString(KEY_LANGUAGE, selected).apply() }) { password ->
 
                     if (security.verify(password)) {
 
@@ -8254,9 +8446,16 @@ class MainActivity : ComponentActivity() {
                     onThemeChange = { selectedMode ->
                         themeMode = selectedMode
                         preferences.edit().putString(KEY_THEME_MODE, selectedMode).apply()
-                    }
+                    },
+                    language = language,
+                    onLanguageChange = { selected -> language = selected; preferences.edit().putString(KEY_LANGUAGE, selected).apply() },
+                    country = country,
+                    currencyCode = currencyCode,
+                    currencySymbol = currencySymbol,
+                    onRegionChange = { selectedCountry, code, symbol -> country = selectedCountry; currencyCode = code; currencySymbol = symbol; preferences.edit().putString(KEY_COUNTRY, selectedCountry).putString(KEY_CURRENCY_CODE, code).putString(KEY_CURRENCY_SYMBOL, symbol).apply() },
+                    onCustomPaymentListsChange = { banks, providers -> preferences.edit().putStringSet(KEY_CUSTOM_BANKS, banks.toSet()).putStringSet(KEY_CUSTOM_PROVIDERS, providers.toSet()).apply(); AppLocaleState.customBanks = banks; AppLocaleState.customProviders = providers }
                 )
-            }
+            } }
             }
         }
     }
@@ -8269,7 +8468,9 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun SetupScreen(
-    onSet: (String) -> Unit
+    language: String,
+    onLanguageChange: (String) -> Unit,
+    onSet: (String, String, String, String) -> Unit
 ) {
 
     var password by remember {
@@ -8283,6 +8484,10 @@ fun SetupScreen(
     var error by remember {
         mutableStateOf("")
     }
+    var region by remember { mutableStateOf("Bangladesh") }
+    var countryName by remember { mutableStateOf("") }
+    var currencyCode by remember { mutableStateOf("BDT") }
+    var currencySymbol by remember { mutableStateOf("৳") }
 
     Column(
 
@@ -8298,6 +8503,11 @@ fun SetupScreen(
             Alignment.CenterHorizontally
 
     ) {
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = language == "EN", onClick = { onLanguageChange("EN") }, label = { Text("English") })
+            FilterChip(selected = language == "BN", onClick = { onLanguageChange("BN") }, label = { Text("Bangla") })
+        }
 
         Image(
             painter = painterResource(com.mdzahidalam.myfinancetracker.R.drawable.app_logo),
@@ -8340,6 +8550,17 @@ fun SetupScreen(
             confirmPassword = it
         }
 
+        Spacer(Modifier.height(8.dp))
+        ChoiceDropdown("Country", region, listOf("Bangladesh", "Other country")) {
+            region = it
+            if (it == "Bangladesh") { currencyCode = "BDT"; currencySymbol = "৳" }
+        }
+        if (region == "Other country") {
+            Field("Country name", countryName) { countryName = it }
+            Field("Currency code (for example USD)", currencyCode) { currencyCode = it.uppercase().take(3) }
+            Field("Currency symbol", currencySymbol) { currencySymbol = it.take(4) }
+        }
+
         if (error.isNotEmpty()) {
 
             Spacer(
@@ -8369,12 +8590,16 @@ fun SetupScreen(
                     password != confirmPassword ->
                         "Passwords do not match."
 
+                    region == "Other country" && countryName.trim().isBlank() -> "Enter your country name."
+
+                    currencyCode.length != 3 || currencySymbol.isBlank() -> "Enter a valid currency code and symbol."
+
                     else ->
                         ""
                 }
 
                 if (error.isEmpty()) {
-                    onSet(password)
+                    onSet(password, if (region == "Bangladesh") "Bangladesh" else countryName.trim(), currencyCode, currencySymbol)
                 }
             },
 
@@ -8397,6 +8622,8 @@ fun SetupScreen(
 
 @Composable
 fun LockScreen(
+    language: String,
+    onLanguageChange: (String) -> Unit,
     onUnlock: (String) -> Boolean
 ) {
 
@@ -8422,6 +8649,11 @@ fun LockScreen(
             Alignment.CenterHorizontally
 
     ) {
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(selected = language == "EN", onClick = { onLanguageChange("EN") }, label = { Text("English") })
+            FilterChip(selected = language == "BN", onClick = { onLanguageChange("BN") }, label = { Text("Bangla") })
+        }
 
         Image(
             painter = painterResource(com.mdzahidalam.myfinancetracker.R.drawable.app_logo),
@@ -8518,3 +8750,5 @@ fun LockScreen(
         )
     }
 }
+
+
