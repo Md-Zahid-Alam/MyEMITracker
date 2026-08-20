@@ -1,0 +1,19 @@
+My Finance Tracker - Version 5.4
+
+Debt navigation correction
+- Payments keeps one Debts section.
+- Tapping Debts expands Money I Owe and Money Owed to Me underneath it.
+- Each option opens its own separate list and preserves direction-locked entry from V5.3.
+
+Professional Excel workbook
+- Replaced the legacy single-column .xls export with a genuine .xlsx OpenXML workbook.
+- Workbook respects the current Reports search and filters.
+- Separate worksheets: Summary, EMI, Loans, Debts, Expenses, and Payments.
+- Data is separated into real columns rather than report lines in one column.
+- Teal header styling, white bold header text, frozen first row, automatic filters, useful widths, and currency number formatting.
+- Payments sheet includes method, provider/bank, reference, party, account, branch, routing, method details, and notes.
+- Workbook opens in modern Excel-compatible applications using the standard .xlsx MIME type.
+
+Build
+- Version name: 5.4
+- Version code: 18

@@ -1,8 +1,14 @@
-# My Finance Tracker — Version 5.3
+# My Finance Tracker — Version 5.4
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 5.3 updates
+## Version 5.4 updates
+
+- Debts remains one Payments-page section and expands to separate Money I Owe and Money Owed to Me pages.
+- Excel export is now a genuine `.xlsx` OpenXML workbook instead of a legacy single-column `.xls` file.
+- Separate Summary, EMI, Loans, Debts, Expenses, and Payments worksheets.
+- Teal styled headers, frozen top rows, filters, useful column widths, numeric amount cells, and structured fields.
+- Workbook export respects the filters currently applied on the Reports page.
 
 - Separate Money I Owe and Money Owed to Me pages with direction fixed during new record creation.
 - Reusable method-specific payment fields across payment requests and recorded payments.
@@ -45,4 +51,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The workflow uploads a signed V5.3 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
+The workflow uploads a signed V5.4 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
