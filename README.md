@@ -1,8 +1,16 @@
-# My Finance Tracker — Version 5.2
+# My Finance Tracker — Version 5.3
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 5.2 updates
+## Version 5.3 updates
+
+- Separate Money I Owe and Money Owed to Me pages with direction fixed during new record creation.
+- Reusable method-specific payment fields across payment requests and recorded payments.
+- Mobile banking provider selection and searchable offline Bangladeshi bank selection.
+- Structured account, branch, routing, reference, cheque, salary and card-detail validation.
+- Compact single-row Payment Request actions.
+- Searchable and filterable Reports with period, type, status and sorting controls.
+- Collapsible report results plus Summary PDF, Detailed PDF and filtered Excel exports.
 
 - Strict debt overpayment protection and completed-debt payment blocking.
 - Payment requests support partial payment, paid and cancelled states, editing, confirmed cancellation and request-linked received payments.
@@ -37,4 +45,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The workflow uploads a signed V5.2 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
+The workflow uploads a signed V5.3 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
