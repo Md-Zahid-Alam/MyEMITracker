@@ -1,8 +1,16 @@
-# My Finance Tracker — Version 5.4
+# My Finance Tracker — Version 6.0
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 5.4 updates
+## Version 6.0 updates
+
+- English and বাংলা can be selected during first setup, on login, and in Settings.
+- Bangladesh defaults to BDT and includes a compact built-in bank/mobile-banking list.
+- International users select their country and currency and save only the banks/providers they use.
+- Country or currency changes display a warning because existing amounts are not converted.
+- PDF and Excel report labels follow the selected app language and currency.
+
+## Earlier Version 5.4 updates
 
 - Debts remains one Payments-page section and expands to separate Money I Owe and Money Owed to Me pages.
 - Excel export is now a genuine `.xlsx` OpenXML workbook instead of a legacy single-column `.xls` file.
@@ -51,4 +59,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The workflow uploads a signed V5.4 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
+The workflow uploads a signed V6.0 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
