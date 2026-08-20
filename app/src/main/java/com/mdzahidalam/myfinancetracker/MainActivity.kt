@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -192,7 +193,11 @@ data class Payment(
     val referenceNumber: String = "",
     val counterparty: String = "",
     val attachments: List<Attachment> = emptyList(),
-    val appliedRequestId: String = ""
+    val appliedRequestId: String = "",
+    val accountNumber: String = "",
+    val branch: String = "",
+    val routingNumber: String = "",
+    val methodDetails: String = ""
 )
 
 data class Attachment(
@@ -212,7 +217,14 @@ data class PaymentRequest(
     val paymentInstructions: String,
     val message: String,
     val status: String = "UNPAID",
-    val receivedAmount: Double = 0.0
+    val receivedAmount: Double = 0.0,
+    val paymentChannel: String = "",
+    val accountName: String = "",
+    val accountNumber: String = "",
+    val branch: String = "",
+    val routingNumber: String = "",
+    val referenceNumber: String = "",
+    val methodDetails: String = ""
 )
 
 data class ReceiptProfile(
@@ -901,6 +913,13 @@ class FinanceRepository(private val context: Context) {
         put("message", item.message)
         put("status", item.status)
         put("receivedAmount", item.receivedAmount)
+        put("paymentChannel", item.paymentChannel)
+        put("accountName", item.accountName)
+        put("accountNumber", item.accountNumber)
+        put("branch", item.branch)
+        put("routingNumber", item.routingNumber)
+        put("referenceNumber", item.referenceNumber)
+        put("methodDetails", item.methodDetails)
     }
 
     private fun paymentJson(payment: Payment): JSONObject {
@@ -925,6 +944,10 @@ class FinanceRepository(private val context: Context) {
             put("counterparty", payment.counterparty)
             put("attachments", attachmentsJson(payment.attachments))
             put("appliedRequestId", payment.appliedRequestId)
+            put("accountNumber", payment.accountNumber)
+            put("branch", payment.branch)
+            put("routingNumber", payment.routingNumber)
+            put("methodDetails", payment.methodDetails)
         }
     }
 
@@ -1112,7 +1135,14 @@ class FinanceRepository(private val context: Context) {
                             paymentInstructions = item.optString("paymentInstructions", ""),
                             message = item.optString("message", ""),
                             status = item.optString("status", "UNPAID"),
-                            receivedAmount = item.optDouble("receivedAmount", 0.0)
+                            receivedAmount = item.optDouble("receivedAmount", 0.0),
+                            paymentChannel = item.optString("paymentChannel", ""),
+                            accountName = item.optString("accountName", ""),
+                            accountNumber = item.optString("accountNumber", ""),
+                            branch = item.optString("branch", ""),
+                            routingNumber = item.optString("routingNumber", ""),
+                            referenceNumber = item.optString("referenceNumber", ""),
+                            methodDetails = item.optString("methodDetails", "")
                         )
                     )
                 }
@@ -1164,7 +1194,11 @@ class FinanceRepository(private val context: Context) {
                             referenceNumber = item.optString("referenceNumber", ""),
                             counterparty = item.optString("counterparty", ""),
                             attachments = readAttachments(item.optJSONArray("attachments")),
-                            appliedRequestId = item.optString("appliedRequestId", "")
+                            appliedRequestId = item.optString("appliedRequestId", ""),
+                            accountNumber = item.optString("accountNumber", ""),
+                            branch = item.optString("branch", ""),
+                            routingNumber = item.optString("routingNumber", ""),
+                            methodDetails = item.optString("methodDetails", "")
                         )
                     )
                 }
@@ -1982,7 +2016,11 @@ class FinanceViewModel(
         counterparty: String = "",
         notes: String = "",
         attachments: List<Attachment> = emptyList(),
-        requestId: String = ""
+        requestId: String = "",
+        accountNumber: String = "",
+        branch: String = "",
+        routingNumber: String = "",
+        methodDetails: String = ""
     ) {
 
         if (!amount.isFinite() || amount <= 0) {
@@ -2016,7 +2054,11 @@ class FinanceViewModel(
                 referenceNumber = reference,
                 counterparty = counterparty,
                 attachments = attachments,
-                appliedRequestId = requestId
+                appliedRequestId = requestId,
+                accountNumber = accountNumber,
+                branch = branch,
+                routingNumber = routingNumber,
+                methodDetails = methodDetails
             )
 
         updateDebt(syncPaymentRequestStatuses(
@@ -2389,6 +2431,7 @@ fun FinanceApp(
                         viewModel.data.debts.find {
                             it.id == selectedId
                         },
+                        initialDirection = if (paymentSection == "DebtsOwed") "Owed to Me" else "I Owe",
                         done = {
                             if (selectedId.isBlank()) selectedType = "" else selectedType = "debt_detail"
                         }
@@ -2574,7 +2617,8 @@ fun PaymentsHub(
                 when (section) {
                     "EMI" -> "EMI Plans"
                     "Loans" -> "Loans"
-                    else -> "Debts"
+                    "DebtsOwe" -> "Money I Owe"
+                    else -> "Money Owed to Me"
                 },
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
@@ -2616,7 +2660,8 @@ fun PaymentsHub(
             when (section) {
                 "EMI" -> EmiList(viewModel, search, sortMode) { onOpen("emi_detail", it) }
                 "Loans" -> LoanList(viewModel, search, sortMode) { onOpen("loan_detail", it) }
-                else -> DebtList(viewModel, search, sortMode) { onOpen("debt_detail", it) }
+                "DebtsOwe" -> DebtList(viewModel, search, sortMode, "I Owe") { onOpen("debt_detail", it) }
+                else -> DebtList(viewModel, search, sortMode, "Owed to Me") { onOpen("debt_detail", it) }
             }
         }
     }
@@ -2650,13 +2695,8 @@ fun PaymentsLanding(viewModel: FinanceViewModel, onOpenSection: (String) -> Unit
                 onClick = { onOpenSection("Loans") }
             )
         }
-        item {
-            PaymentSectionCard(
-                title = "Debts",
-                summary = "Pay ${money(debtToPay)} • Receive ${money(moneyToReceive)}",
-                onClick = { onOpenSection("Debts") }
-            )
-        }
+        item { PaymentSectionCard("Money I Owe", "${activeDebts.count { it.direction == "I Owe" }} active • ${money(debtToPay)} to pay") { onOpenSection("DebtsOwe") } }
+        item { PaymentSectionCard("Money Owed to Me", "${activeDebts.count { it.direction == "Owed to Me" }} active • ${money(moneyToReceive)} to receive") { onOpenSection("DebtsOwed") } }
     }
 }
 
@@ -2891,6 +2931,11 @@ private fun DebtPaymentEntry(viewModel: FinanceViewModel, debt: Debt, onSaved: (
     var paidDate by remember { mutableStateOf(expenseDateText(System.currentTimeMillis())) }
     var method by remember { mutableStateOf("Cash") }
     var channel by remember { mutableStateOf("") }
+    var accountName by remember { mutableStateOf(debt.name) }
+    var accountNumber by remember { mutableStateOf("") }
+    var branch by remember { mutableStateOf("") }
+    var routingNumber by remember { mutableStateOf("") }
+    var methodDetails by remember { mutableStateOf("") }
     var reference by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var attachments by remember { mutableStateOf(emptyList<Attachment>()) }
@@ -2905,10 +2950,13 @@ private fun DebtPaymentEntry(viewModel: FinanceViewModel, debt: Debt, onSaved: (
     Text("${debt.name} • Remaining ${money(remaining)}", fontWeight = FontWeight.Bold)
     Field(if (debt.direction == "Owed to Me") "Received amount" else "Payment amount", amount) { amount = it; error = "" }
     DatePickerField("Payment date", paidDate) { paidDate = it; error = "" }
-    ChoiceDropdown("Payment method", method, listOf("Cash", "Bank transfer", "Mobile banking", "Salary deduction", "Card", "Cheque", "Other")) { method = it }
-    if (method == "Mobile banking") ChoiceDropdown("Provider", channel.ifBlank { "bKash" }, listOf("bKash", "Nagad", "Rocket", "Other")) { channel = it }
-    if (method == "Bank transfer") Field("Bank name", channel) { channel = it }
-    Field("Transaction / reference ID", reference) { reference = it }
+    ChoiceDropdown("Payment method", method, listOf("Cash", "Bank transfer", "Mobile banking", "Salary deduction", "Card", "Cheque", "Other")) {
+        method = it; channel = ""; accountNumber = ""; branch = ""; routingNumber = ""; reference = ""; methodDetails = ""; accountName = if (it == "Cash") debt.name else ""
+    }
+    PaymentMethodDetailsFields(
+        method, channel, { channel = it }, accountName, { accountName = it }, accountNumber, { accountNumber = it },
+        branch, { branch = it }, routingNumber, { routingNumber = it }, reference, { reference = it }, methodDetails, { methodDetails = it }
+    )
     Field("Payment notes", notes) { notes = it }
     AttachmentSection(attachments, maxFiles = 3) { attachments = it }
     if (debt.direction == "Owed to Me" && openRequests.isNotEmpty()) {
@@ -2926,11 +2974,11 @@ private fun DebtPaymentEntry(viewModel: FinanceViewModel, debt: Debt, onSaved: (
             selectedRequest != null && value > (selectedRequest.amount - selectedRequest.receivedAmount) + 0.005 -> "Amount cannot exceed this request's outstanding balance."
             date == null -> "Select a valid payment date."
             date > System.currentTimeMillis() -> "Payment date cannot be in the future."
-            (method == "Mobile banking" || method == "Bank transfer") && channel.isBlank() -> "Enter the payment provider or bank."
+            paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, reference, methodDetails).isNotBlank() -> paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, reference, methodDetails)
             else -> ""
         }
         if (error.isBlank() && date != null) {
-            viewModel.markDebtPaid(debt.id, value, paidDate = date, method = method, channel = channel, reference = reference.trim(), counterparty = debt.name, notes = notes.trim(), attachments = attachments, requestId = selectedRequest?.id ?: "")
+            viewModel.markDebtPaid(debt.id, value, paidDate = date, method = method, channel = channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, reference = reference.trim(), counterparty = accountName.trim(), notes = notes.trim(), attachments = attachments, requestId = selectedRequest?.id ?: "", accountNumber = accountNumber.trim(), branch = branch.trim(), routingNumber = routingNumber.trim(), methodDetails = methodDetails.trim())
             onSaved()
         }
     }, modifier = Modifier.fillMaxWidth()) { Text(if (debt.direction == "Owed to Me") "Save Received Amount" else "Save Payment") }
@@ -3815,20 +3863,20 @@ fun DebtList(
     viewModel: FinanceViewModel,
     search: String,
     sortMode: String,
+    direction: String,
     onOpen: (String) -> Unit
 ) {
 
     var pendingDelete by remember { mutableStateOf<Debt?>(null) }
     var pendingAction by remember { mutableStateOf<ConfirmationRequest?>(null) }
     var statusFilter by remember { mutableStateOf("Active") }
-    var directionFilter by remember { mutableStateOf("I Owe") }
     val filteredItems = viewModel.data.debts.filter { item ->
         val statusMatches = when (statusFilter) {
             "Archived" -> item.archived
             "Completed" -> !item.archived && debtCompleted(item)
             else -> !item.archived && !debtCompleted(item)
         }
-        statusMatches && item.direction == directionFilter && (
+        statusMatches && item.direction == direction && (
             search.isBlank() ||
             listOf(item.name, item.direction, item.notes).any {
                 it.contains(search.trim(), ignoreCase = true)
@@ -3856,26 +3904,10 @@ fun DebtList(
     ) {
 
         item {
-            val toPay = viewModel.data.debts.filter { !it.archived && it.direction == "I Owe" }.sumOf { debtRemainingAmount(it) }
-            val toReceive = viewModel.data.debts.filter { !it.archived && it.direction == "Owed to Me" }.sumOf { debtRemainingAmount(it) }
-            Text("Debts", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            val directionTotal = viewModel.data.debts.filter { !it.archived && it.direction == direction }.sumOf { debtRemainingAmount(it) }
+            Text(if (direction == "I Owe") "Money I Owe" else "Money Owed to Me", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SummaryCard("Debt to pay", money(toPay), Modifier.weight(1f))
-                SummaryCard("Money to receive", money(toReceive), Modifier.weight(1f))
-            }
-        }
-
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("I Owe", "Owed to Me").forEach { option ->
-                    if (directionFilter == option) {
-                        Button(onClick = { directionFilter = option }, modifier = Modifier.weight(1f)) { Text(option) }
-                    } else {
-                        OutlinedButton(onClick = { directionFilter = option }, modifier = Modifier.weight(1f)) { Text(option) }
-                    }
-                }
-            }
+            SummaryCard(if (direction == "I Owe") "Total to pay" else "Total to receive", money(directionTotal), Modifier.fillMaxWidth())
         }
 
         item {
@@ -3887,7 +3919,7 @@ fun DebtList(
             item {
 
                 Text(
-                    "No $statusFilter records under $directionFilter."
+                    "No $statusFilter records."
                 )
             }
         }
@@ -4486,6 +4518,10 @@ private fun paymentReceiptText(
         appendLine("Amount in words: ${amountInWords(payment.amount)}")
         appendLine("Payment method: ${payment.paymentMethod}")
         if (payment.paymentChannel.isNotBlank()) appendLine("Channel: ${payment.paymentChannel}")
+        if (payment.accountNumber.isNotBlank()) appendLine("Account / last four digits: ${payment.accountNumber}")
+        if (payment.branch.isNotBlank()) appendLine("Branch: ${payment.branch}")
+        if (payment.routingNumber.isNotBlank()) appendLine("Routing number: ${payment.routingNumber}")
+        if (payment.methodDetails.isNotBlank()) appendLine("Method details: ${payment.methodDetails}")
         if (payment.referenceNumber.isNotBlank()) appendLine("Transaction/reference ID: ${payment.referenceNumber}")
         appendLine("Previous balance: ${money(previousBalance)}")
         appendLine("Remaining balance: ${money(remainingBalance)}")
@@ -4754,6 +4790,10 @@ fun PaymentEditDialog(
     var paymentChannel by remember(payment) { mutableStateOf(payment.paymentChannel) }
     var referenceNumber by remember(payment) { mutableStateOf(payment.referenceNumber) }
     var counterparty by remember(payment) { mutableStateOf(payment.counterparty) }
+    var accountNumber by remember(payment) { mutableStateOf(payment.accountNumber) }
+    var branch by remember(payment) { mutableStateOf(payment.branch) }
+    var routingNumber by remember(payment) { mutableStateOf(payment.routingNumber) }
+    var methodDetails by remember(payment) { mutableStateOf(payment.methodDetails) }
     var attachments by remember(payment) { mutableStateOf(payment.attachments) }
     var error by remember(payment) { mutableStateOf("") }
 
@@ -4771,14 +4811,11 @@ fun PaymentEditDialog(
                     "Payment method",
                     paymentMethod,
                     listOf("Cash", "Bank transfer", "Mobile banking", "Salary deduction", "Card", "Cheque", "Other")
-                ) { paymentMethod = it }
-                if (paymentMethod == "Mobile banking") {
-                    ChoiceDropdown("Mobile banking provider", paymentChannel.ifBlank { "bKash" }, listOf("bKash", "Nagad", "Rocket", "Other")) { paymentChannel = it }
-                } else if (paymentMethod == "Bank transfer" || paymentMethod == "Salary deduction") {
-                    Field(if (paymentMethod == "Bank transfer") "Bank name" else "Employer / salary month", paymentChannel) { paymentChannel = it }
-                }
-                Field("Transaction / reference ID", referenceNumber) { referenceNumber = it }
-                Field("Paid to / received from", counterparty) { counterparty = it }
+                ) { paymentMethod = it; paymentChannel = ""; counterparty = ""; accountNumber = ""; branch = ""; routingNumber = ""; referenceNumber = ""; methodDetails = "" }
+                PaymentMethodDetailsFields(
+                    paymentMethod, paymentChannel, { paymentChannel = it }, counterparty, { counterparty = it }, accountNumber, { accountNumber = it },
+                    branch, { branch = it }, routingNumber, { routingNumber = it }, referenceNumber, { referenceNumber = it }, methodDetails, { methodDetails = it }
+                )
                 AttachmentSection(attachments, maxFiles = 3) { attachments = it }
                 if (error.isNotEmpty()) {
                     Text(error, color = MaterialTheme.colorScheme.error)
@@ -4797,8 +4834,8 @@ fun PaymentEditDialog(
                         error = "Paid date cannot be in the future."
                     } else if (parsedPaidDate != null && paymentMethod == "Not recorded") {
                         error = "Select how this payment was made."
-                    } else if (parsedPaidDate != null && (paymentMethod == "Mobile banking" || paymentMethod == "Bank transfer") && paymentChannel.isBlank()) {
-                        error = "Enter the mobile banking provider or bank name."
+                    } else if (parsedPaidDate != null && paymentMethodValidation(paymentMethod, paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") "bKash" else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") BangladeshBanks.first() else "" }, counterparty, accountNumber, referenceNumber, methodDetails).isNotBlank()) {
+                        error = paymentMethodValidation(paymentMethod, paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") "bKash" else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") BangladeshBanks.first() else "" }, counterparty, accountNumber, referenceNumber, methodDetails)
                     } else if (notes.length > 500 || referenceNumber.length > 100 || counterparty.length > 100) {
                         error = "Notes must be 500 characters or less; reference and party names must be 100 or less."
                     } else {
@@ -4808,10 +4845,14 @@ fun PaymentEditDialog(
                                 paidDate = parsedPaidDate,
                                 notes = notes.trim(),
                                 paymentMethod = paymentMethod,
-                                paymentChannel = paymentChannel.trim(),
+                                paymentChannel = paymentChannel.ifBlank { if (paymentMethod == "Mobile banking") "bKash" else if (paymentMethod == "Bank transfer" || paymentMethod == "Cheque") BangladeshBanks.first() else "" },
                                 referenceNumber = referenceNumber.trim(),
                                 counterparty = counterparty.trim(),
                                 attachments = attachments,
+                                accountNumber = accountNumber.trim(),
+                                branch = branch.trim(),
+                                routingNumber = routingNumber.trim(),
+                                methodDetails = methodDetails.trim(),
                                 status = if (parsedPaidDate == null) "PENDING" else "PAID"
                             )
                         )
@@ -5952,6 +5993,7 @@ fun LoanForm(
 fun DebtForm(
     viewModel: FinanceViewModel,
     existing: Debt?,
+    initialDirection: String = "I Owe",
     done: () -> Unit
 ) {
 
@@ -5965,7 +6007,7 @@ fun DebtForm(
 
     var direction by remember {
         mutableStateOf(
-            existing?.direction ?: "I Owe"
+            existing?.direction ?: initialDirection
         )
     }
 
@@ -6053,12 +6095,11 @@ fun DebtForm(
             name = it
         }
 
-        ChoiceDropdown(
-            label = "Direction",
-            value = direction,
-            options = listOf("I Owe", "Owed to Me"),
-            onSelect = { direction = it }
-        )
+        if (existing != null && existing.payments.isEmpty() && existing.paymentRequests.isEmpty() && !viewOnly) {
+            ChoiceDropdown("Direction", direction, listOf("I Owe", "Owed to Me")) { direction = it }
+        } else {
+            InfoRow("Direction", direction)
+        }
 
         Text(
             if (direction == "I Owe") "You need to pay this person or organization." else "This person or organization needs to pay you.",
@@ -6427,6 +6468,13 @@ private fun paymentRequestText(debt: Debt, request: PaymentRequest, profile: Rec
     appendLine("Request status: ${request.status}")
     appendLine("Remaining to receive: ${money(debtRemainingAmount(debt))}")
     appendLine("Preferred method: ${request.paymentMethod}")
+    if (request.paymentChannel.isNotBlank()) appendLine("Provider / bank: ${request.paymentChannel}")
+    if (request.accountName.isNotBlank()) appendLine("Account holder: ${request.accountName}")
+    if (request.accountNumber.isNotBlank()) appendLine("Account / mobile number: ${request.accountNumber}")
+    if (request.branch.isNotBlank()) appendLine("Branch: ${request.branch}")
+    if (request.routingNumber.isNotBlank()) appendLine("Routing number: ${request.routingNumber}")
+    if (request.referenceNumber.isNotBlank()) appendLine("Reference: ${request.referenceNumber}")
+    if (request.methodDetails.isNotBlank()) appendLine("Method details: ${request.methodDetails}")
     if (request.paymentInstructions.isNotBlank()) appendLine("Payment instructions: ${request.paymentInstructions}")
     if (request.message.isNotBlank()) appendLine("Message: ${request.message}")
     appendLine()
@@ -6457,17 +6505,15 @@ fun PaymentRequestCard(
             request.dueDate?.let { Text("Due ${dateText(it)}") }
             if (request.receivedAmount > 0) Text("Received ${money(request.receivedAmount)}")
             Text(request.status, color = if (request.status == "CANCELLED") MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 TextButton(onClick = {
                     pendingText = paymentRequestText(debt, request, profile)
                     launcher.launch("${request.requestNumber}.pdf")
-                }) { Text("Save PDF") }
-                TextButton(onClick = { sharePdf(context, "${request.requestNumber}.pdf", paymentRequestText(debt, request, profile)) }) { Text("Share") }
-            }
-            if (request.status in listOf("UNPAID", "PARTIALLY PAID")) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    onEdit?.let { TextButton(onClick = it) { Text("Edit") } }
-                    onCancel?.let { TextButton(onClick = it) { Text("Cancel", color = MaterialTheme.colorScheme.error) } }
+                }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp)) { Text("Save PDF", fontSize = 11.sp, maxLines = 1) }
+                TextButton(onClick = { sharePdf(context, "${request.requestNumber}.pdf", paymentRequestText(debt, request, profile)) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp)) { Text("Share", fontSize = 11.sp, maxLines = 1) }
+                if (request.status in listOf("UNPAID", "PARTIALLY PAID")) {
+                    onEdit?.let { TextButton(onClick = it, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp)) { Text("Edit", fontSize = 11.sp, maxLines = 1) } }
+                    onCancel?.let { TextButton(onClick = it, modifier = Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 2.dp)) { Text("Cancel", color = MaterialTheme.colorScheme.error, fontSize = 11.sp, maxLines = 1) } }
                 }
             }
         }
@@ -6480,6 +6526,13 @@ fun PaymentRequestDialog(debt: Debt, existing: PaymentRequest? = null, onSave: (
     var amount by remember { mutableStateOf((existing?.amount ?: maximum).toString()) }
     var dueDate by remember { mutableStateOf(expenseDateText(existing?.dueDate ?: System.currentTimeMillis())) }
     var method by remember { mutableStateOf(existing?.paymentMethod ?: "Mobile banking") }
+    var channel by remember { mutableStateOf(existing?.paymentChannel ?: "") }
+    var accountName by remember { mutableStateOf(existing?.accountName ?: "") }
+    var accountNumber by remember { mutableStateOf(existing?.accountNumber ?: "") }
+    var branch by remember { mutableStateOf(existing?.branch ?: "") }
+    var routingNumber by remember { mutableStateOf(existing?.routingNumber ?: "") }
+    var referenceNumber by remember { mutableStateOf(existing?.referenceNumber ?: "") }
+    var methodDetails by remember { mutableStateOf(existing?.methodDetails ?: "") }
     var instructions by remember { mutableStateOf(existing?.paymentInstructions ?: "") }
     var message by remember { mutableStateOf(existing?.message ?: "") }
     var error by remember { mutableStateOf("") }
@@ -6492,7 +6545,13 @@ fun PaymentRequestDialog(debt: Debt, existing: PaymentRequest? = null, onSave: (
                 Text("Available to request: ${money(maximum)}", color = MaterialTheme.colorScheme.primary)
                 Field("Requested amount", amount) { amount = it }
                 DatePickerField("Due date", dueDate) { dueDate = it }
-                ChoiceDropdown("Preferred payment method", method, listOf("Cash", "Bank transfer", "Mobile banking", "Cheque", "Other")) { method = it }
+                ChoiceDropdown("Preferred payment method", method, listOf("Cash", "Bank transfer", "Mobile banking", "Cheque", "Other")) {
+                    method = it; channel = ""; accountName = ""; accountNumber = ""; branch = ""; routingNumber = ""; referenceNumber = ""; methodDetails = ""
+                }
+                PaymentMethodDetailsFields(
+                    method, channel, { channel = it }, accountName, { accountName = it }, accountNumber, { accountNumber = it },
+                    branch, { branch = it }, routingNumber, { routingNumber = it }, referenceNumber, { referenceNumber = it }, methodDetails, { methodDetails = it }
+                )
                 Field("Payment instructions", instructions) { instructions = it }
                 Field("Message", message) { message = it }
                 if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
@@ -6509,6 +6568,7 @@ fun PaymentRequestDialog(debt: Debt, existing: PaymentRequest? = null, onSave: (
                     parsedDue == null -> "Enter a valid due date."
                     parsedDue < Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis -> "Due date cannot be in the past."
                     method in listOf("Bank transfer", "Mobile banking") && instructions.isBlank() -> "Enter payment instructions for the selected method."
+                    paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, referenceNumber, methodDetails).isNotBlank() -> paymentMethodValidation(method, channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" }, accountName, accountNumber, referenceNumber, methodDetails)
                     instructions.length > 300 || message.length > 500 -> "Instructions must be 300 characters or less and message 500 or less."
                     else -> ""
                 }
@@ -6525,7 +6585,14 @@ fun PaymentRequestDialog(debt: Debt, existing: PaymentRequest? = null, onSave: (
                             paymentInstructions = instructions.trim(),
                             message = message.trim(),
                             status = existing?.status ?: "UNPAID",
-                            receivedAmount = existing?.receivedAmount ?: 0.0
+                            receivedAmount = existing?.receivedAmount ?: 0.0,
+                            paymentChannel = channel.ifBlank { if (method == "Mobile banking") "bKash" else if (method == "Bank transfer" || method == "Cheque") BangladeshBanks.first() else "" },
+                            accountName = accountName.trim(),
+                            accountNumber = accountNumber.trim(),
+                            branch = branch.trim(),
+                            routingNumber = routingNumber.trim(),
+                            referenceNumber = referenceNumber.trim(),
+                            methodDetails = methodDetails.trim()
                         )
                     )
                 }
@@ -6929,7 +6996,7 @@ fun AboutScreen(done: () -> Unit) {
                 modifier = Modifier.size(112.dp)
             )
             Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Version 5.2")
+            Text("Version 5.3")
             Spacer(Modifier.height(8.dp))
             Text("Created and owned by", color = MaterialTheme.colorScheme.secondary)
             Text("Md. Zahid Alam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -7018,6 +7085,125 @@ fun ChoiceDropdown(
             }
         }
     }
+}
+
+private val BangladeshBanks = listOf(
+    "Sonali Bank", "Janata Bank", "Agrani Bank", "Rupali Bank", "BRAC Bank",
+    "Dutch-Bangla Bank", "Islami Bank Bangladesh", "The City Bank", "Eastern Bank",
+    "Prime Bank", "Pubali Bank", "Bank Asia", "Southeast Bank", "Standard Chartered Bank",
+    "HSBC Bangladesh", "Mutual Trust Bank", "United Commercial Bank", "IFIC Bank",
+    "NCC Bank", "Mercantile Bank", "Social Islami Bank", "Al-Arafah Islami Bank",
+    "Shahjalal Islami Bank", "Jamuna Bank", "ONE Bank", "Dhaka Bank", "Trust Bank",
+    "Community Bank Bangladesh", "Other bank"
+)
+
+@Composable
+private fun SearchableBankPicker(value: String, onSelect: (String) -> Unit) {
+    var visible by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    OutlinedButton(onClick = { visible = true }, modifier = Modifier.fillMaxWidth()) {
+        Text("Bank name: ${value.ifBlank { BangladeshBanks.first() }}")
+    }
+    if (visible) {
+        val matches = BangladeshBanks.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) }
+        AlertDialog(
+            onDismissRequest = { visible = false },
+            title = { Text("Select Bank") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(query, { query = it }, label = { Text("Search bank") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Column(Modifier.height(300.dp).verticalScroll(rememberScrollState())) {
+                        matches.forEach { bank ->
+                            TextButton(onClick = { onSelect(bank); visible = false; query = "" }, modifier = Modifier.fillMaxWidth()) { Text(bank) }
+                        }
+                        if (matches.isEmpty()) Text("No bank found.")
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { visible = false }) { Text("Close") } }
+        )
+    }
+}
+
+@Composable
+fun PaymentMethodDetailsFields(
+    method: String,
+    channel: String,
+    onChannel: (String) -> Unit,
+    accountName: String,
+    onAccountName: (String) -> Unit,
+    accountNumber: String,
+    onAccountNumber: (String) -> Unit,
+    branch: String,
+    onBranch: (String) -> Unit,
+    routingNumber: String,
+    onRoutingNumber: (String) -> Unit,
+    reference: String,
+    onReference: (String) -> Unit,
+    methodDetails: String,
+    onMethodDetails: (String) -> Unit
+) {
+    when (method) {
+        "Mobile banking" -> {
+            ChoiceDropdown("Mobile banking provider", channel.ifBlank { "bKash" }, listOf("bKash", "Nagad", "Rocket", "Upay", "Other provider"), onChannel)
+            if (channel == "Other provider") Field("Provider name", methodDetails, onChange = onMethodDetails)
+            Field("Mobile / account number", accountNumber, onChange = onAccountNumber)
+            Field("Account holder (optional)", accountName, onChange = onAccountName)
+            Field("Transaction ID", reference, onChange = onReference)
+        }
+        "Bank transfer" -> {
+            SearchableBankPicker(channel.ifBlank { BangladeshBanks.first() }, onChannel)
+            if (channel == "Other bank") Field("Other bank name", methodDetails, onChange = onMethodDetails)
+            Field("Account holder", accountName, onChange = onAccountName)
+            Field("Account number", accountNumber, onChange = onAccountNumber)
+            Field("Branch (optional)", branch, onChange = onBranch)
+            Field("Routing number (optional)", routingNumber, onChange = onRoutingNumber)
+            Field("Transaction / reference ID", reference, onChange = onReference)
+        }
+        "Cheque" -> {
+            SearchableBankPicker(channel.ifBlank { BangladeshBanks.first() }, onChannel)
+            if (channel == "Other bank") Field("Other bank name", methodDetails, onChange = onMethodDetails)
+            Field("Cheque number", reference, onChange = onReference)
+            Field("Account holder (optional)", accountName, onChange = onAccountName)
+        }
+        "Salary deduction" -> {
+            Field("Employer", accountName, onChange = onAccountName)
+            Field("Salary month", methodDetails, onChange = onMethodDetails)
+            Field("Reference (optional)", reference, onChange = onReference)
+        }
+        "Card" -> {
+            Field("Card issuer / bank", channel, onChange = onChannel)
+            Field("Last four digits", accountNumber, onChange = onAccountNumber)
+            Field("Transaction ID", reference, onChange = onReference)
+        }
+        "Cash" -> Field("Paid to / received from", accountName, onChange = onAccountName)
+        "Other" -> {
+            Field("Method name", methodDetails, onChange = onMethodDetails)
+            Field("Reference (optional)", reference, onChange = onReference)
+        }
+    }
+}
+
+private fun paymentMethodValidation(
+    method: String,
+    channel: String,
+    accountName: String,
+    accountNumber: String,
+    reference: String,
+    methodDetails: String
+): String = when {
+    method == "Mobile banking" && channel.isBlank() -> "Select a mobile banking provider."
+    method == "Mobile banking" && channel == "Other provider" && methodDetails.isBlank() -> "Enter the provider name."
+    method == "Mobile banking" && accountNumber.filter { it.isDigit() }.length !in 7..15 -> "Enter a valid mobile/account number."
+    method == "Bank transfer" && channel.isBlank() -> "Select a bank."
+    method == "Bank transfer" && channel == "Other bank" && methodDetails.isBlank() -> "Enter the bank name."
+    method == "Bank transfer" && accountName.isBlank() -> "Enter the account holder name."
+    method == "Bank transfer" && accountNumber.isBlank() -> "Enter the account number."
+    method == "Cheque" && (channel.isBlank() || reference.isBlank()) -> "Select the bank and enter the cheque number."
+    method == "Salary deduction" && (accountName.isBlank() || methodDetails.isBlank()) -> "Enter the employer and salary month."
+    method == "Card" && (!Regex("^[0-9]{4}$").matches(accountNumber) || reference.isBlank()) -> "Enter the card's last four digits and transaction ID."
+    method == "Other" && methodDetails.isBlank() -> "Enter the payment method name."
+    else -> ""
 }
 
 @Composable
@@ -7217,211 +7403,140 @@ fun Field(
 // REPORTS
 // ============================================================
 
+private fun LazyListScope.reportResultSection(
+    title: String,
+    lines: List<String>,
+    expanded: Boolean,
+    onToggle: () -> Unit
+) {
+    if (lines.isEmpty()) return
+    item(key = "section-$title") {
+        OutlinedButton(onClick = onToggle, modifier = Modifier.fillMaxWidth()) {
+            Text("${if (expanded) "−" else "+"} $title (${lines.size})")
+        }
+    }
+    if (expanded) {
+        items(lines) { line -> Card(Modifier.fillMaxWidth()) { Text(line, Modifier.padding(12.dp)) } }
+    }
+}
+
 @Composable
 fun Reports(
     viewModel: FinanceViewModel
 ) {
-
-    val context =
-        LocalContext.current
-
-    var pendingReport by remember {
-        mutableStateOf("")
-    }
+    val context = LocalContext.current
+    var pendingReport by remember { mutableStateOf("") }
     var pendingExcel by remember { mutableStateOf("") }
+    var filtersVisible by remember { mutableStateOf(false) }
+    var search by remember { mutableStateOf("") }
+    var reportType by remember { mutableStateOf("Overview") }
+    var period by remember { mutableStateOf("This month") }
+    var status by remember { mutableStateOf("All statuses") }
+    var sort by remember { mutableStateOf("Newest first") }
+    var startDate by remember { mutableStateOf(expenseDateText(Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 1) }.timeInMillis)) }
+    var endDate by remember { mutableStateOf(expenseDateText(System.currentTimeMillis())) }
+    var expanded by remember { mutableStateOf(setOf<String>()) }
 
-    val launcher =
-        rememberLauncherForActivityResult(
-            ActivityResultContracts.CreateDocument(
-                "application/pdf"
-            )
-        ) { uri ->
-
-            if (
-                uri != null &&
-                pendingReport.isNotEmpty()
-            ) {
-
-                writePdfToUri(
-                    context,
-                    uri,
-                    pendingReport
-                )
-            }
-
-            pendingReport = ""
-        }
-
-    val excelLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/vnd.ms-excel")
-    ) { uri ->
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null && pendingReport.isNotEmpty()) writePdfToUri(context, uri, pendingReport)
+        pendingReport = ""
+    }
+    val excelLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.ms-excel")) { uri ->
         if (uri != null && pendingExcel.isNotEmpty()) writeExcelToUri(context, uri, pendingExcel)
         pendingExcel = ""
     }
-
-    fun createReport(
-        fileName: String,
-        content: String
-    ) {
-
-        pendingReport = content
-
-        launcher.launch(fileName)
-    }
-
-    fun createExcel(fileName: String, content: String) {
-        pendingExcel = content
-        excelLauncher.launch(fileName)
-    }
-
-    Column(
-
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(
-                    rememberScrollState()
-                )
-                .padding(16.dp),
-
-        verticalArrangement =
-            Arrangement.spacedBy(12.dp)
-    ) {
-
-        Text(
-            "Reports",
-            style =
-                MaterialTheme.typography
-                    .headlineSmall,
-            fontWeight =
-                FontWeight.Bold
-        )
-
-        Text(
-            "PDF reports are generated locally. " +
-                    "Save them in Downloads or Documents " +
-                    "so they remain available even if the app is uninstalled."
-        )
-
-        Button(
-
-            onClick = {
-
-                createReport(
-                    "Complete_Finance_Report.pdf",
-                    buildCompleteReport(
-                        viewModel.data
-                    )
-                )
-            },
-
-            modifier =
-                Modifier.fillMaxWidth()
-
-        ) {
-
-            Icon(
-                Icons.Default.PictureAsPdf,
-                contentDescription = null
-            )
-
-            Spacer(
-                Modifier.width(8.dp)
-            )
-
-            Text(
-                "Generate Complete Report"
-            )
-        }
-
-        OutlinedButton(
-            onClick = { createExcel("Complete_Finance_Report.xls", buildCompleteReport(viewModel.data)) },
-            modifier = Modifier.fillMaxWidth()
-        ) { Text("Download Complete Excel Report") }
-
-        viewModel.data.emis.forEach { item ->
-
-            OutlinedButton(
-
-                onClick = {
-
-                    createReport(
-                        "EMI_${safe(item.name)}.pdf",
-                        buildEmiReport(item)
-                    )
-                },
-
-                modifier =
-                    Modifier.fillMaxWidth()
-
-            ) {
-
-                Text(
-                    "PDF: ${item.name}"
-                )
-            }
-        }
-
-        viewModel.data.loans.forEach { item ->
-
-            OutlinedButton(
-
-                onClick = {
-
-                    createReport(
-                        "Loan_${safe(item.name)}.pdf",
-                        buildLoanReport(item)
-                    )
-                },
-
-                modifier =
-                    Modifier.fillMaxWidth()
-
-            ) {
-
-                Text(
-                    "PDF: ${item.name}"
-                )
-            }
-        }
-
-        viewModel.data.debts.forEach { item ->
-
-            OutlinedButton(
-
-                onClick = {
-
-                    createReport(
-                        "Debt_${safe(item.name)}.pdf",
-                        buildDebtReport(item)
-                    )
-                },
-
-                modifier =
-                    Modifier.fillMaxWidth()
-
-            ) {
-
-                Text(
-                    "PDF: ${item.name}"
-                )
-            }
-        }
-
-        if (viewModel.data.expenses.isNotEmpty()) {
-            OutlinedButton(
-                onClick = {
-                    createReport(
-                        "Expense_Report.pdf",
-                        buildExpenseReport(viewModel.data.expenses)
-                    )
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("PDF: All Expenses")
-            }
+    fun inPeriod(value: Long): Boolean {
+        val now = Calendar.getInstance()
+        val record = Calendar.getInstance().apply { timeInMillis = value }
+        return when (period) {
+            "This month" -> now.get(Calendar.YEAR) == record.get(Calendar.YEAR) && now.get(Calendar.MONTH) == record.get(Calendar.MONTH)
+            "Last month" -> Calendar.getInstance().apply { add(Calendar.MONTH, -1) }.let { it.get(Calendar.YEAR) == record.get(Calendar.YEAR) && it.get(Calendar.MONTH) == record.get(Calendar.MONTH) }
+            "Custom range" -> value in (parseExpenseDate(startDate) ?: 0L)..((parseExpenseDate(endDate) ?: Long.MAX_VALUE) + 86_399_999L)
+            else -> true
         }
     }
+    fun statusMatches(archived: Boolean, completed: Boolean): Boolean = when (status) {
+        "Active" -> !archived && !completed
+        "Completed" -> !archived && completed
+        "Archived" -> archived
+        "Paid" -> completed
+        "Pending" -> !archived && !completed
+        "Cancelled" -> false
+        else -> true
+    }
+    val query = search.trim()
+    var emis = viewModel.data.emis.filter { (inPeriod(it.startDate) || it.payments.any { p -> inPeriod(p.paidDate ?: p.dueDate) }) && statusMatches(it.archived, emiCompleted(it)) && (query.isBlank() || listOf(it.name, it.category, it.seller).any { value -> value.contains(query, true) }) && reportType in listOf("Overview", "Payments", "EMI") }
+    var loans = viewModel.data.loans.filter { (inPeriod(it.startDate) || it.payments.any { p -> inPeriod(p.paidDate ?: p.dueDate) }) && statusMatches(it.archived, loanCompleted(it)) && (query.isBlank() || listOf(it.name, it.type, it.lender).any { value -> value.contains(query, true) }) && reportType in listOf("Overview", "Payments", "Loans") }
+    var debts = viewModel.data.debts.filter { ((it.dueDate?.let { value -> inPeriod(value) } == true) || it.payments.any { p -> inPeriod(p.paidDate ?: p.dueDate) } || it.paymentRequests.any { request -> inPeriod(request.createdDate) }) && (if (status == "Cancelled") it.paymentRequests.any { request -> request.status == "CANCELLED" } else statusMatches(it.archived, debtCompleted(it))) && (query.isBlank() || listOf(it.name, it.notes, it.reason).any { value -> value.contains(query, true) }) && when (reportType) { "Overview", "Payments" -> true; "Money I Owe" -> it.direction == "I Owe"; "Money Owed to Me" -> it.direction == "Owed to Me"; else -> false } }
+    var expenses = viewModel.data.expenses.filter { status == "All statuses" && inPeriod(it.date) && (query.isBlank() || listOf(it.title, it.category, it.notes).any { value -> value.contains(query, true) }) && reportType in listOf("Overview", "Expenses") }
+    when (sort) {
+        "Oldest first" -> { emis = emis.sortedBy { it.startDate }; loans = loans.sortedBy { it.startDate }; debts = debts.sortedBy { it.dueDate ?: 0L }; expenses = expenses.sortedBy { it.date } }
+        "Highest amount" -> { emis = emis.sortedByDescending { it.totalPayable }; loans = loans.sortedByDescending { it.totalPayable }; debts = debts.sortedByDescending { it.originalAmount }; expenses = expenses.sortedByDescending { it.amount } }
+        "Lowest amount" -> { emis = emis.sortedBy { it.totalPayable }; loans = loans.sortedBy { it.totalPayable }; debts = debts.sortedBy { it.originalAmount }; expenses = expenses.sortedBy { it.amount } }
+        else -> { emis = emis.sortedByDescending { it.startDate }; loans = loans.sortedByDescending { it.startDate }; debts = debts.sortedByDescending { it.dueDate ?: 0L }; expenses = expenses.sortedByDescending { it.date } }
+    }
+    val filteredData = FinanceData(emis, loans, debts, expenses, viewModel.data.receiptProfile)
+    val matchCount = emis.size + loans.size + debts.size + expenses.size
+
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Reports", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = { filtersVisible = !filtersVisible }) { Icon(Icons.Default.Sort, "Report filters") }
+            }
+            Text("$matchCount matching records • $period")
+        }
+        if (filtersVisible) item {
+            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(search, { search = it }, label = { Text("Search records") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                ChoiceDropdown("Report type", reportType, listOf("Overview", "Payments", "EMI", "Loans", "Money I Owe", "Money Owed to Me", "Expenses")) { reportType = it }
+                ChoiceDropdown("Report period", period, listOf("This month", "Last month", "Custom range", "All time")) { period = it }
+                if (period == "Custom range") { DatePickerField("From", startDate) { startDate = it }; DatePickerField("To", endDate) { endDate = it } }
+                ChoiceDropdown("Status", status, listOf("All statuses", "Active", "Completed", "Archived", "Paid", "Pending", "Cancelled")) { status = it }
+                ChoiceDropdown("Sort", sort, listOf("Newest first", "Oldest first", "Highest amount", "Lowest amount")) { sort = it }
+                TextButton(onClick = { search = ""; reportType = "Overview"; period = "This month"; status = "All statuses"; sort = "Newest first" }) { Text("Clear Filters") }
+            } }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Filtered Summary", fontWeight = FontWeight.Bold)
+                Text("EMI ${emis.size} • Loans ${loans.size} • Debts ${debts.size} • Expenses ${expenses.size}")
+                Text("Expenses: ${money(expenses.sumOf { it.amount })}", color = MaterialTheme.colorScheme.primary)
+            } }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(onClick = { pendingReport = buildSummaryReport(filteredData, period, reportType); launcher.launch("Finance_Summary.pdf") }, enabled = matchCount > 0, modifier = Modifier.weight(1f)) { Text("Summary PDF") }
+                OutlinedButton(onClick = { pendingReport = buildCompleteReport(filteredData); launcher.launch("Finance_Detailed.pdf") }, enabled = matchCount > 0, modifier = Modifier.weight(1f)) { Text("Detailed PDF") }
+            }
+            OutlinedButton(onClick = { pendingExcel = buildCompleteReport(filteredData); excelLauncher.launch("Filtered_Finance_Report.xls") }, enabled = matchCount > 0, modifier = Modifier.fillMaxWidth()) { Text("Filtered Excel") }
+        }
+        reportResultSection("EMI", emis.map { "${it.name} • ${money(it.totalPayable)} • ${if (emiCompleted(it)) "Completed" else "Active"}" }, "EMI" in expanded) { expanded = if ("EMI" in expanded) expanded - "EMI" else expanded + "EMI" }
+        reportResultSection("Loans", loans.map { "${it.name} • ${money(it.totalPayable)} • ${if (loanCompleted(it)) "Completed" else "Active"}" }, "Loans" in expanded) { expanded = if ("Loans" in expanded) expanded - "Loans" else expanded + "Loans" }
+        reportResultSection("Money I Owe", debts.filter { it.direction == "I Owe" }.map { "${it.name} • ${money(debtRemainingAmount(it))} to pay" }, "Money I Owe" in expanded) { expanded = if ("Money I Owe" in expanded) expanded - "Money I Owe" else expanded + "Money I Owe" }
+        reportResultSection("Money Owed to Me", debts.filter { it.direction == "Owed to Me" }.map { "${it.name} • ${money(debtRemainingAmount(it))} to receive" }, "Money Owed to Me" in expanded) { expanded = if ("Money Owed to Me" in expanded) expanded - "Money Owed to Me" else expanded + "Money Owed to Me" }
+        reportResultSection("Expenses", expenses.map { "${expenseDayKey(it.date)} • ${it.title} • ${money(it.amount)}" }, "Expenses" in expanded) { expanded = if ("Expenses" in expanded) expanded - "Expenses" else expanded + "Expenses" }
+        if (matchCount == 0) item { Text("No records match the selected filters.") }
+    }
+}
+
+fun buildSummaryReport(data: FinanceData, period: String, reportType: String): String = buildString {
+    appendLine("MY FINANCE TRACKER — SUMMARY REPORT")
+    appendLine("Generated: ${dateTimeText(System.currentTimeMillis())}")
+    appendLine("Period: $period")
+    appendLine("Report type: $reportType")
+    appendLine()
+    appendLine("RECORD SUMMARY")
+    appendLine("EMI plans: ${data.emis.size}")
+    appendLine("Loans: ${data.loans.size}")
+    appendLine("Money I owe: ${data.debts.count { it.direction == "I Owe" }}")
+    appendLine("Money owed to me: ${data.debts.count { it.direction == "Owed to Me" }}")
+    appendLine("Expenses: ${data.expenses.size}")
+    appendLine("Expense total: ${money(data.expenses.sumOf { it.amount })}")
+    appendLine("EMI remaining: ${money(data.emis.sumOf { it.payments.filter { p -> p.paidDate == null }.sumOf { p -> p.amount } })}")
+    appendLine("Loan remaining: ${money(data.loans.sumOf { it.payments.filter { p -> p.paidDate == null }.sumOf { p -> p.amount } })}")
+    appendLine("Debt to pay: ${money(data.debts.filter { it.direction == "I Owe" }.sumOf { debtRemainingAmount(it) })}")
+    appendLine("Money to receive: ${money(data.debts.filter { it.direction == "Owed to Me" }.sumOf { debtRemainingAmount(it) })}")
 }
 
 
