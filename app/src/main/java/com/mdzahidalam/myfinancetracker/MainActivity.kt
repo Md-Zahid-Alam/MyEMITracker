@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -86,6 +87,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -394,6 +396,7 @@ data class Debt(
     val dueDate: Long?,
     val notes: String,
     val payments: List<Payment>,
+    val debtDate: Long = System.currentTimeMillis(),
     val archived: Boolean = false,
     val reason: String = "",
     val receivedOrGivenMethod: String = "",
@@ -1151,6 +1154,7 @@ class FinanceRepository(private val context: Context) {
             put("direction", item.direction)
 
             put("originalAmount", item.originalAmount)
+            put("debtDate", item.debtDate)
 
             put(
                 "dueDate",
@@ -1529,6 +1533,7 @@ class FinanceRepository(private val context: Context) {
                             "originalAmount",
                             0.0
                         ),
+                        debtDate = item.optLong("debtDate", item.optLong("dueDate", System.currentTimeMillis())),
                         dueDate =
                             if (item.isNull("dueDate")) {
                                 null
@@ -2405,8 +2410,19 @@ fun FinanceApp(
                         },
 
                         label = {
-                            Text(label)
-                        }
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                maxLines = 1
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     )
                 }
             }
@@ -2583,6 +2599,17 @@ fun FinanceApp(
                     )
                 }
 
+                selectedType == "country" -> {
+                    CountrySettingsScreen(
+                        country = country,
+                        currencyCode = currencyCode,
+                        currencySymbol = currencySymbol,
+                        onRegionChange = onRegionChange,
+                        onCustomPaymentListsChange = onCustomPaymentListsChange,
+                        done = { selectedType = "" }
+                    )
+                }
+
                 tab == 0 -> Dashboard(viewModel)
 
                 tab == 1 -> PaymentsHub(
@@ -2621,6 +2648,7 @@ fun FinanceApp(
                     onLock = onLogout,
                     onAbout = { selectedType = "about" },
                     onReceiptProfile = { selectedType = "receipt_profile" },
+                    onCountry = { selectedType = "country" },
                     themeMode = themeMode,
                     onThemeChange = onThemeChange,
                     language = language,
@@ -3011,7 +3039,7 @@ fun PaymentPlanInformation(viewModel: FinanceViewModel, kind: String, id: String
                 InfoRow("Due day", loan.dueDay.toString()); InfoRow("Reminder days", loan.reminderDays.joinToString(", ")); InfoRow("Status", if (loan.archived) "Archived" else if (loanCompleted(loan)) "Completed" else "Active")
             }
             debt != null -> {
-                InfoRow("Person / organization", debt.name); InfoRow("Direction", debt.direction); InfoRow("Original amount", money(debt.originalAmount))
+                InfoRow("Person / organization", debt.name); InfoRow("Direction", debt.direction); InfoRow("Debt date", dateText(debt.debtDate)); InfoRow("Original amount", money(debt.originalAmount))
                 InfoRow("Paid / received", money(debtPaidAmount(debt))); InfoRow("Remaining", money(debtRemainingAmount(debt))); InfoRow("Due date", debt.dueDate?.let { dateText(it) } ?: "Not specified")
                 InfoRow("Reason", debt.reason); InfoRow("Notes", debt.notes); InfoRow("Status", if (debt.archived) "Archived" else if (debtCompleted(debt)) "Completed" else "Active")
             }
@@ -6158,6 +6186,8 @@ fun DebtForm(
     }
 
     var reason by remember { mutableStateOf(existing?.reason ?: "") }
+    var debtDate by remember { mutableStateOf(expenseDateText(existing?.debtDate ?: System.currentTimeMillis())) }
+    var dueDate by remember { mutableStateOf(existing?.dueDate?.let(::expenseDateText) ?: "") }
     var receivedOrGivenMethod by remember { mutableStateOf(existing?.receivedOrGivenMethod ?: "Cash") }
     var debtReference by remember { mutableStateOf(existing?.referenceNumber ?: "") }
     var attachments by remember { mutableStateOf(existing?.attachments ?: emptyList()) }
@@ -6187,6 +6217,8 @@ fun DebtForm(
         amount != (existing?.originalAmount?.toString() ?: "") ||
         notes != (existing?.notes ?: "") ||
         reason != (existing?.reason ?: "") ||
+        debtDate != expenseDateText(existing?.debtDate ?: System.currentTimeMillis()) ||
+        dueDate != (existing?.dueDate?.let(::expenseDateText) ?: "") ||
         receivedOrGivenMethod != (existing?.receivedOrGivenMethod ?: "Cash") ||
         debtReference != (existing?.referenceNumber ?: "") ||
         attachments != (existing?.attachments ?: emptyList<Attachment>()) ||
@@ -6253,6 +6285,8 @@ fun DebtForm(
             notes = it
         }
         Field("Reason for debt", reason) { reason = it }
+        DatePickerField("Debt date", debtDate) { debtDate = it }
+        DatePickerField("Due date (optional)", dueDate) { dueDate = it }
         ChoiceDropdown(
             if (direction == "I Owe") "How you received it" else "How you gave it",
             receivedOrGivenMethod,
@@ -6359,6 +6393,8 @@ fun DebtForm(
                                             name = name.trim(),
                                             direction = direction,
                                             originalAmount = updatedAmount,
+                                            debtDate = parseExpenseDate(debtDate) ?: existing.debtDate,
+                                            dueDate = if (dueDate.isBlank()) null else parseExpenseDate(dueDate),
                                             notes = notes.trim(),
                                             reason = reason.trim(),
                                             receivedOrGivenMethod = receivedOrGivenMethod,
@@ -6510,12 +6546,15 @@ fun DebtForm(
                         amount.toDoubleOrNull()
                             ?: 0.0
                     val previousAmount = previousPayment.toDoubleOrNull() ?: 0.0
+                    val selectedDebtDate = parseExpenseDate(debtDate)
+                    val selectedDueDate = if (dueDate.isBlank()) null else parseExpenseDate(dueDate)
 
                     if (
                         name.isBlank() || name.trim().length > 100 || notes.length > 500 || debtReference.length > 100 ||
                         !originalAmount.isFinite() || originalAmount <= 0 || originalAmount > 999_999_999.99 ||
                         !previousAmount.isFinite() || previousAmount < 0 ||
-                        previousAmount > originalAmount
+                        previousAmount > originalAmount || selectedDebtDate == null || (dueDate.isNotBlank() && selectedDueDate == null) ||
+                        (selectedDueDate != null && selectedDebtDate != null && selectedDueDate < selectedDebtDate)
                     ) {
 
                         error =
@@ -6531,8 +6570,9 @@ fun DebtForm(
                                     direction.trim(),
                                 originalAmount =
                                     originalAmount,
+                                debtDate = selectedDebtDate,
                                 dueDate =
-                                    null,
+                                    selectedDueDate,
                                 notes = notes.trim(),
                                 reason = reason.trim(),
                                 receivedOrGivenMethod = receivedOrGivenMethod,
@@ -6984,6 +7024,7 @@ fun SettingsScreen(
     onLock: () -> Unit,
     onAbout: () -> Unit,
     onReceiptProfile: () -> Unit,
+    onCountry: () -> Unit,
     themeMode: String,
     onThemeChange: (String) -> Unit,
     language: String,
@@ -6994,47 +7035,13 @@ fun SettingsScreen(
     onRegionChange: (String, String, String) -> Unit,
     onCustomPaymentListsChange: (List<String>, List<String>) -> Unit
 ) {
-    var selectedCountry by remember(country) { mutableStateOf(if (country == "Bangladesh") "Bangladesh" else "Other country") }
-    var customCountry by remember(country) { mutableStateOf(if (country == "Bangladesh") "" else country) }
-    var draftCurrencyCode by remember(currencyCode) { mutableStateOf(currencyCode) }
-    var draftCurrencySymbol by remember(currencySymbol) { mutableStateOf(currencySymbol) }
-    var customBanks by remember { mutableStateOf(AppLocaleState.customBanks) }
-    var customProviders by remember { mutableStateOf(AppLocaleState.customProviders) }
-    var newBank by remember { mutableStateOf("") }
-    var newProvider by remember { mutableStateOf("") }
-    var showRegionWarning by remember { mutableStateOf(false) }
-
     FormColumn("Settings") {
         Text("Security and local data tools")
 
-        Text("Language and region", fontWeight = FontWeight.Bold)
+        Text("Language and appearance", fontWeight = FontWeight.Bold)
         ChoiceDropdown("Language", if (language == "BN") "Bangla" else "English", listOf("English", "Bangla")) {
             onLanguageChange(if (it == "Bangla") "BN" else "EN")
         }
-        ChoiceDropdown("Country", selectedCountry, listOf("Bangladesh", "Other country")) {
-            selectedCountry = it
-            if (it == "Bangladesh") { draftCurrencyCode = "BDT"; draftCurrencySymbol = "৳" }
-        }
-        if (selectedCountry == "Other country") {
-            Field("Country name", customCountry) { customCountry = it }
-            Field("Currency code (for example USD)", draftCurrencyCode) { draftCurrencyCode = it.uppercase().take(3) }
-            Field("Currency symbol", draftCurrencySymbol) { draftCurrencySymbol = it.take(4) }
-        }
-        OutlinedButton(onClick = { showRegionWarning = true }, modifier = Modifier.fillMaxWidth()) { Text("Apply country and currency") }
-        Text("Changing currency changes the displayed symbol only; existing amounts are not converted.", style = MaterialTheme.typography.bodySmall)
-
-        Text("My payment institutions", fontWeight = FontWeight.Bold)
-        Text(if (selectedCountry == "Bangladesh") "Bangladesh banks and mobile banking services are already included. Add any extra services below." else "Add only the banks and payment services you use. They stay on this device.")
-        Field("Add bank", newBank) { newBank = it }
-        OutlinedButton(onClick = {
-            val value = newBank.trim(); if (value.isNotBlank() && customBanks.none { it.equals(value, true) }) { customBanks = customBanks + value; newBank = ""; onCustomPaymentListsChange(customBanks, customProviders) }
-        }, modifier = Modifier.fillMaxWidth()) { Text("Add bank") }
-        customBanks.forEach { bank -> TextButton(onClick = { customBanks = customBanks - bank; onCustomPaymentListsChange(customBanks, customProviders) }) { Text("$bank  •  Remove") } }
-        Field("Add mobile banking provider", newProvider) { newProvider = it }
-        OutlinedButton(onClick = {
-            val value = newProvider.trim(); if (value.isNotBlank() && customProviders.none { it.equals(value, true) }) { customProviders = customProviders + value; newProvider = ""; onCustomPaymentListsChange(customBanks, customProviders) }
-        }, modifier = Modifier.fillMaxWidth()) { Text("Add provider") }
-        customProviders.forEach { provider -> TextButton(onClick = { customProviders = customProviders - provider; onCustomPaymentListsChange(customBanks, customProviders) }) { Text("$provider  •  Remove") } }
 
         Text("Appearance", fontWeight = FontWeight.Bold)
         ChoiceDropdown(
@@ -7055,6 +7062,10 @@ fun SettingsScreen(
                 )
             }
         )
+
+        OutlinedButton(onClick = onCountry, modifier = Modifier.fillMaxWidth()) {
+            Text("Country, currency and payment institutions")
+        }
 
         OutlinedButton(
             onClick = onChangePassword,
@@ -7107,15 +7118,72 @@ fun SettingsScreen(
             style = MaterialTheme.typography.bodySmall
         )
     }
+}
+
+@Composable
+fun CountrySettingsScreen(
+    country: String,
+    currencyCode: String,
+    currencySymbol: String,
+    onRegionChange: (String, String, String) -> Unit,
+    onCustomPaymentListsChange: (List<String>, List<String>) -> Unit,
+    done: () -> Unit
+) {
+    var selectedCountry by remember(country) { mutableStateOf(if (country == "Bangladesh") "Bangladesh" else "Other country") }
+    var customCountry by remember(country) { mutableStateOf(if (country == "Bangladesh") "" else country) }
+    var draftCurrencyCode by remember(currencyCode) { mutableStateOf(currencyCode) }
+    var draftCurrencySymbol by remember(currencySymbol) { mutableStateOf(currencySymbol) }
+    var customBanks by remember { mutableStateOf(AppLocaleState.customBanks) }
+    var customProviders by remember { mutableStateOf(AppLocaleState.customProviders) }
+    var newBank by remember { mutableStateOf("") }
+    var newProvider by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+    var showRegionWarning by remember { mutableStateOf(false) }
+
+    FormColumn("Country", onBack = done) {
+        Text("Country and currency", fontWeight = FontWeight.Bold)
+        ChoiceDropdown("Country", selectedCountry, listOf("Bangladesh", "Other country")) {
+            selectedCountry = it
+            if (it == "Bangladesh") { draftCurrencyCode = "BDT"; draftCurrencySymbol = "৳" }
+        }
+        if (selectedCountry == "Other country") {
+            Field("Country name", customCountry) { customCountry = it; error = "" }
+            Field("Currency code (for example USD)", draftCurrencyCode) { draftCurrencyCode = it.uppercase().take(3); error = "" }
+            Field("Currency symbol", draftCurrencySymbol) { draftCurrencySymbol = it.take(4); error = "" }
+        }
+        if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error)
+        OutlinedButton(onClick = {
+            error = when {
+                selectedCountry == "Other country" && customCountry.trim().length !in 2..60 -> "Enter a valid country name."
+                draftCurrencyCode.length != 3 || !draftCurrencyCode.all { it.isLetter() } -> "Currency code must contain three letters."
+                draftCurrencySymbol.isBlank() -> "Enter a currency symbol."
+                else -> ""
+            }
+            if (error.isBlank()) showRegionWarning = true
+        }, modifier = Modifier.fillMaxWidth()) { Text("Apply country and currency") }
+        Text("Changing currency changes the displayed symbol only; existing amounts are not converted.", style = MaterialTheme.typography.bodySmall)
+
+        Text("My payment institutions", fontWeight = FontWeight.Bold)
+        Text(if (selectedCountry == "Bangladesh") "Bangladesh banks and mobile banking services are already included. Add any extra services below." else "Add only the banks and payment services you use. They stay on this device.")
+        Field("Add bank", newBank) { newBank = it }
+        OutlinedButton(onClick = {
+            val value = newBank.trim()
+            if (value.length in 2..100 && customBanks.none { it.equals(value, true) }) { customBanks = customBanks + value; newBank = ""; onCustomPaymentListsChange(customBanks, customProviders) }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Add bank") }
+        customBanks.forEach { bank -> TextButton(onClick = { customBanks = customBanks - bank; onCustomPaymentListsChange(customBanks, customProviders) }) { Text("$bank  •  Remove") } }
+        Field("Add mobile banking provider", newProvider) { newProvider = it }
+        OutlinedButton(onClick = {
+            val value = newProvider.trim()
+            if (value.length in 2..100 && customProviders.none { it.equals(value, true) }) { customProviders = customProviders + value; newProvider = ""; onCustomPaymentListsChange(customBanks, customProviders) }
+        }, modifier = Modifier.fillMaxWidth()) { Text("Add provider") }
+        customProviders.forEach { provider -> TextButton(onClick = { customProviders = customProviders - provider; onCustomPaymentListsChange(customBanks, customProviders) }) { Text("$provider  •  Remove") } }
+    }
     if (showRegionWarning) ConfirmationDialog(
         request = ConfirmationRequest(
             title = "Change country and currency?",
             message = "Existing money values will not be converted. Only the country, currency code, symbol, and available payment choices will change.",
             confirmLabel = "Change",
-            onConfirm = {
-                val finalCountry = if (selectedCountry == "Bangladesh") "Bangladesh" else customCountry.trim()
-                if (finalCountry.isNotBlank() && draftCurrencyCode.length == 3 && draftCurrencySymbol.isNotBlank()) onRegionChange(finalCountry, draftCurrencyCode, draftCurrencySymbol)
-            }
+            onConfirm = { onRegionChange(if (selectedCountry == "Bangladesh") "Bangladesh" else customCountry.trim(), draftCurrencyCode, draftCurrencySymbol) }
         ),
         onDismiss = { showRegionWarning = false }
     )
@@ -7186,7 +7254,7 @@ fun AboutScreen(done: () -> Unit) {
                 modifier = Modifier.size(112.dp)
             )
             Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Version 5.4")
+            Text("Version 6.0")
             Spacer(Modifier.height(8.dp))
             Text("Created and owned by", color = MaterialTheme.colorScheme.secondary)
             Text("Md. Zahid Alam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -8151,7 +8219,14 @@ private data class XlsxMoney(val value: Double)
 private data class XlsxNumber(val value: Number)
 
 fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, period: String, reportType: String) {
-    fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+    fun escape(value: String): String {
+        // XML 1.0 forbids most control characters. Desktop Excel rejects the entire
+        // worksheet when one appears in a user-entered name, reference, or note.
+        val xmlSafe = value.filter { character ->
+            character == '\t' || character == '\n' || character == '\r' || character.code >= 0x20
+        }
+        return xmlSafe.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
+    }
     fun columnName(index: Int): String {
         var value = index + 1
         var result = ""
@@ -8161,6 +8236,9 @@ fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, pe
     fun sheet(headers: List<String>, rows: List<List<Any?>>): String = buildString {
         append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">")
         append("<sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews>")
+        // OOXML requires sheetFormatPr before cols and sheetData. Mobile viewers
+        // tolerated the old order, but desktop Microsoft Excel removed the sheets.
+        append("<sheetFormatPr defaultRowHeight=\"18\"/>")
         append("<cols>"); headers.indices.forEach { index -> append("<col min=\"${index + 1}\" max=\"${index + 1}\" width=\"${when { headers[index].contains("Note") || headers[index].contains("Details") -> 28; headers[index].contains("Date") -> 15; else -> 20 }}\" customWidth=\"1\"/>") }; append("</cols><sheetData>")
         fun row(number: Int, values: List<Any?>, header: Boolean = false) {
             append("<row r=\"$number\">")
@@ -8175,7 +8253,7 @@ fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, pe
             append("</row>")
         }
         row(1, headers, true); rows.forEachIndexed { index, values -> row(index + 2, values) }
-        append("</sheetData><autoFilter ref=\"A1:${columnName(headers.lastIndex)}${rows.size + 1}\"/><sheetFormatPr defaultRowHeight=\"18\"/></worksheet>")
+        append("</sheetData><autoFilter ref=\"A1:${columnName(headers.lastIndex)}${rows.size + 1}\"/></worksheet>")
     }
 
     val summaryRows = listOf(
@@ -8190,7 +8268,7 @@ fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, pe
         localized("Summary") to sheet(listOf("Metric", "Value"), summaryRows),
         localized("EMI") to sheet(listOf("Item", "Category", "Seller", "Price", "Down Payment", "Financed", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.emis.map { listOf(it.name, it.category, it.seller, XlsxMoney(it.price), XlsxMoney(it.downPayment), XlsxMoney(it.financedAmount), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (emiCompleted(it)) "Completed" else "Active") }),
         localized("Loans") to sheet(listOf("Loan", "Type", "Lender", "Principal", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.loans.map { listOf(it.name, it.type, it.lender, XlsxMoney(it.principal), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (loanCompleted(it)) "Completed" else "Active") }),
-        localized("Debts") to sheet(listOf("Person / Organization", "Direction", "Original", "Paid / Received", "Remaining", "Due Date", "Reason", "Reference", "Status"), data.debts.map { listOf(it.name, it.direction, XlsxMoney(it.originalAmount), XlsxMoney(debtPaidAmount(it)), XlsxMoney(debtRemainingAmount(it)), it.dueDate?.let { value -> dateText(value) } ?: "", it.reason, it.referenceNumber, if (it.archived) "Archived" else if (debtCompleted(it)) "Completed" else "Active") }),
+        localized("Debts") to sheet(listOf("Person / Organization", "Direction", "Debt Date", "Original", "Paid / Received", "Remaining", "Due Date", "Reason", "Reference", "Status"), data.debts.map { listOf(it.name, it.direction, dateText(it.debtDate), XlsxMoney(it.originalAmount), XlsxMoney(debtPaidAmount(it)), XlsxMoney(debtRemainingAmount(it)), it.dueDate?.let { value -> dateText(value) } ?: "", it.reason, it.referenceNumber, if (it.archived) "Archived" else if (debtCompleted(it)) "Completed" else "Active") }),
         localized("Expenses") to sheet(listOf("Date", "Expense", "Category", "Amount", "Notes"), data.expenses.map { listOf(expenseDayKey(it.date), it.title, it.category, XlsxMoney(it.amount), it.notes) }),
         localized("Payments") to sheet(listOf("Record Type", "Record", "Payment No.", "Due Date", "Paid Date", "Amount", "Status", "Method", "Provider / Bank", "Reference", "Party", "Account", "Branch", "Routing", "Details", "Notes"), buildList {
             data.emis.forEach { plan -> plan.payments.forEach { p -> add(listOf("EMI", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
@@ -8494,6 +8572,7 @@ fun SetupScreen(
         modifier =
             Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(24.dp),
 
         verticalArrangement =
@@ -8640,6 +8719,7 @@ fun LockScreen(
         modifier =
             Modifier
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
                 .padding(24.dp),
 
         verticalArrangement =
