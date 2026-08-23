@@ -1,4 +1,4 @@
-My Finance Tracker - Version 6.1
+My Finance Tracker - Version 7.0
 
 Package: com.mdzahidalam.myfinancetracker
 Version code: 18

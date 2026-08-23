@@ -1,0 +1,11 @@
+My Finance Tracker 7.0 - Architecture and Design-System Foundation
+
+- Moved immutable financial models into the domain layer.
+- Moved pure completion, balance, debt-limit and installment rules into testable domain use cases.
+- Added a domain repository interface and injected it into the ViewModel.
+- Centralized Material 3 light/dark colors, typography, shapes and spacing tokens.
+- Added independently testable backup safety and Excel OOXML contracts.
+- Added JUnit tests for installment rounding, debt limits, backup policy and desktop Excel worksheet structure.
+- GitHub Actions now runs unit tests before restoring the signing key and producing release artifacts.
+- Preserved the application ID, encrypted local-data format and backup compatibility.
+- Includes the complete English/Bangla localization and every Version 6.x correction.

@@ -1,8 +1,18 @@
-# My Finance Tracker — Version 6.1
+# My Finance Tracker — Version 7.0
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 6.1 updates
+## Version 7.0 updates
+
+- Introduced domain, data-policy, export-contract and design-system packages.
+- Added repository abstraction and testable pure financial rules.
+- Added automated unit tests to the signed-release workflow.
+- Centralized Material 3 colors, typography, shapes and spacing.
+- Preserved encrypted data and backup compatibility.
+
+See `ARCHITECTURE.md`, `DESIGN_SYSTEM.md` and `TESTING.md`.
+
+## Earlier Version 6.1 updates
 
 - Completed a full English/বাংলা user-interface text audit.
 - Replaced mixed word-by-word translations with natural full-phrase Bangla translations.
@@ -66,4 +76,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The workflow uploads a signed V6.1 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
+The workflow uploads a signed V7.0 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
