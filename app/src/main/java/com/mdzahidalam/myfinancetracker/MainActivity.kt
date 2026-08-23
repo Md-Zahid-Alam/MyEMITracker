@@ -238,6 +238,11 @@ private val BanglaText = mapOf(
 )
 
 private val BanglaAdditionalText = mapOf(
+    "Version 8.3" to "সংস্করণ ৮.৩", "Save this bank for future use" to "ভবিষ্যতের জন্য এই ব্যাংক সংরক্ষণ করুন",
+    "Version 8.2" to "সংস্করণ ৮.২",
+    "Provider / bank" to "সেবাদাতা / ব্যাংক", "Account holder / party" to "হিসাবধারী / পক্ষ",
+    "Account / mobile number" to "হিসাব / মোবাইল নম্বর", "Transaction reference" to "লেনদেন রেফারেন্স",
+    "Method details" to "পদ্ধতির বিস্তারিত", "Received / Given Method" to "পাওয়া / দেওয়ার পদ্ধতি",
     // App identity, login, dashboard and navigation
     "My Finance Tracker" to "মাই ফাইন্যান্স ট্র্যাকার",
     "Your private offline finance tracker" to "আপনার ব্যক্তিগত অফলাইন অর্থ ব্যবস্থাপক",
@@ -292,6 +297,9 @@ private val BanglaAdditionalText = mapOf(
     "Shop or seller" to "দোকান বা বিক্রেতা", "Credit card" to "ক্রেডিট কার্ড", "Friend or family" to "বন্ধু বা পরিবার",
     "Direct purchase financing" to "সরাসরি ক্রয় অর্থায়ন", "Salary arrangement" to "বেতনভিত্তিক ব্যবস্থা", "Goods or service" to "পণ্য বা সেবা",
     "Loan type" to "ঋণের ধরন", "Office Loan" to "অফিস ঋণ", "Personal Loan" to "ব্যক্তিগত ঋণ", "Bank Loan" to "ব্যাংক ঋণ",
+    "Appliances" to "গৃহস্থালি যন্ত্রপাতি", "Furniture" to "আসবাবপত্র", "Vehicle" to "যানবাহন", "Mobile / Computer" to "মোবাইল / কম্পিউটার",
+    "Medical" to "চিকিৎসা", "Home Improvement" to "বাড়ি উন্নয়ন", "Custom category" to "নিজস্ব ক্যাটাগরি",
+    "Salary Loan" to "বেতন ঋণ", "Home Loan" to "গৃহঋণ", "Vehicle Loan" to "যানবাহন ঋণ", "Education Loan" to "শিক্ষা ঋণ", "Business Loan" to "ব্যবসায়িক ঋণ", "Custom loan type" to "নিজস্ব ঋণের ধরন",
     "Repayment method" to "পরিশোধ পদ্ধতি", "Equal Installments" to "সমান কিস্তি", "Flexible Monthly Payment" to "পরিবর্তনশীল মাসিক পেমেন্ট",
     "Installments" to "কিস্তির সংখ্যা", "Planned monthly payment" to "পরিকল্পিত মাসিক পেমেন্ট",
     "Interest rate %" to "সুদের হার %", "Fixed interest amount" to "নির্দিষ্ট সুদের পরিমাণ",
@@ -354,7 +362,7 @@ private val BanglaAdditionalText = mapOf(
     "Reopen Debt?" to "দেনা-পাওনা পুনরায় খুলবেন?", "Reopen EMI?" to "ইএমআই পুনরায় খুলবেন?", "Reopen Loan?" to "ঋণ পুনরায় খুলবেন?",
     "Restore Debt?" to "দেনা-পাওনা পুনরুদ্ধার করবেন?", "Restore EMI?" to "ইএমআই পুনরুদ্ধার করবেন?", "Restore Loan?" to "ঋণ পুনরুদ্ধার করবেন?",
     "Financed amount" to "অর্থায়িত পরিমাণ", "How received" to "যেভাবে পাওয়া হয়েছে", "Interest amount" to "সুদের পরিমাণ", "Interest rate" to "সুদের হার",
-    "Search expenses" to "খরচ খুঁজুন", "Version 6.0" to "সংস্করণ ৬.০", "Version 6.1" to "সংস্করণ ৬.১", "Version 7.0" to "সংস্করণ ৭.০", "Version 8.0" to "সংস্করণ ৮.০", "© 2026 Md. Zahid Alam" to "© ২০২৬ মোঃ জাহিদ আলম",
+    "Search expenses" to "খরচ খুঁজুন", "Version 6.0" to "সংস্করণ ৬.০", "Version 6.1" to "সংস্করণ ৬.১", "Version 7.0" to "সংস্করণ ৭.০", "Version 8.0" to "সংস্করণ ৮.০", "Version 8.1" to "সংস্করণ ৮.১", "© 2026 Md. Zahid Alam" to "© ২০২৬ মোঃ জাহিদ আলম",
     "Md. Zahid Alam" to "মোঃ জাহিদ আলম",
     "Create an app password. The password itself is not stored; only a protected hash is stored on this phone." to "একটি অ্যাপ পাসওয়ার্ড তৈরি করুন। পাসওয়ার্ডটি সংরক্ষণ করা হয় না; এই ফোনে শুধু এর সুরক্ষিত হ্যাশ রাখা হয়।",
     "Attach a PNG or JPEG signature image. It is stored with your encrypted app data and added to generated receipts and payment requests." to "PNG বা JPEG স্বাক্ষরের ছবি সংযুক্ত করুন। এটি এনক্রিপ্টেড অ্যাপ ডেটায় রাখা হবে এবং তৈরি করা রসিদ ও পেমেন্ট অনুরোধে যোগ হবে।",
@@ -1229,6 +1237,13 @@ class FinanceRepository(private val context: Context) : FinanceDataRepository {
             put("receivedMethod", item.receivedMethod)
             put("agreementReference", item.agreementReference)
             put("financingNotes", item.financingNotes)
+            put("financingChannel", item.financingChannel)
+            put("financingAccountName", item.financingAccountName)
+            put("financingAccountNumber", item.financingAccountNumber)
+            put("financingBranch", item.financingBranch)
+            put("financingRoutingNumber", item.financingRoutingNumber)
+            put("financingReference", item.financingReference)
+            put("financingMethodDetails", item.financingMethodDetails)
             put("attachments", attachmentsJson(item.attachments))
 
             put(
@@ -1274,6 +1289,13 @@ class FinanceRepository(private val context: Context) : FinanceDataRepository {
             put("receivedMethod", item.receivedMethod)
             put("agreementReference", item.agreementReference)
             put("financingNotes", item.financingNotes)
+            put("financingChannel", item.financingChannel)
+            put("financingAccountName", item.financingAccountName)
+            put("financingAccountNumber", item.financingAccountNumber)
+            put("financingBranch", item.financingBranch)
+            put("financingRoutingNumber", item.financingRoutingNumber)
+            put("financingReference", item.financingReference)
+            put("financingMethodDetails", item.financingMethodDetails)
             put("attachments", attachmentsJson(item.attachments))
 
             put(
@@ -1313,6 +1335,13 @@ class FinanceRepository(private val context: Context) : FinanceDataRepository {
             put("reason", item.reason)
             put("receivedOrGivenMethod", item.receivedOrGivenMethod)
             put("referenceNumber", item.referenceNumber)
+            put("financingChannel", item.financingChannel)
+            put("financingAccountName", item.financingAccountName)
+            put("financingAccountNumber", item.financingAccountNumber)
+            put("financingBranch", item.financingBranch)
+            put("financingRoutingNumber", item.financingRoutingNumber)
+            put("financingReference", item.financingReference)
+            put("financingMethodDetails", item.financingMethodDetails)
             put("attachments", attachmentsJson(item.attachments))
             put("paymentRequests", JSONArray().apply {
                 item.paymentRequests.forEach { put(paymentRequestJson(it)) }
@@ -1550,6 +1579,13 @@ class FinanceRepository(private val context: Context) : FinanceDataRepository {
                         receivedMethod = item.optString("receivedMethod", ""),
                         agreementReference = item.optString("agreementReference", ""),
                         financingNotes = item.optString("financingNotes", ""),
+                        financingChannel = item.optString("financingChannel", ""),
+                        financingAccountName = item.optString("financingAccountName", ""),
+                        financingAccountNumber = item.optString("financingAccountNumber", ""),
+                        financingBranch = item.optString("financingBranch", ""),
+                        financingRoutingNumber = item.optString("financingRoutingNumber", ""),
+                        financingReference = item.optString("financingReference", ""),
+                        financingMethodDetails = item.optString("financingMethodDetails", ""),
                         attachments = readAttachments(item.optJSONArray("attachments"))
                     )
                 )
@@ -1644,6 +1680,13 @@ class FinanceRepository(private val context: Context) : FinanceDataRepository {
                         receivedMethod = item.optString("receivedMethod", ""),
                         agreementReference = item.optString("agreementReference", ""),
                         financingNotes = item.optString("financingNotes", ""),
+                        financingChannel = item.optString("financingChannel", ""),
+                        financingAccountName = item.optString("financingAccountName", ""),
+                        financingAccountNumber = item.optString("financingAccountNumber", ""),
+                        financingBranch = item.optString("financingBranch", ""),
+                        financingRoutingNumber = item.optString("financingRoutingNumber", ""),
+                        financingReference = item.optString("financingReference", ""),
+                        financingMethodDetails = item.optString("financingMethodDetails", ""),
                         attachments = readAttachments(item.optJSONArray("attachments"))
                     )
                 )
@@ -1698,6 +1741,13 @@ class FinanceRepository(private val context: Context) : FinanceDataRepository {
                         reason = item.optString("reason", ""),
                         receivedOrGivenMethod = item.optString("receivedOrGivenMethod", ""),
                         referenceNumber = item.optString("referenceNumber", ""),
+                        financingChannel = item.optString("financingChannel", ""),
+                        financingAccountName = item.optString("financingAccountName", ""),
+                        financingAccountNumber = item.optString("financingAccountNumber", ""),
+                        financingBranch = item.optString("financingBranch", ""),
+                        financingRoutingNumber = item.optString("financingRoutingNumber", ""),
+                        financingReference = item.optString("financingReference", ""),
+                        financingMethodDetails = item.optString("financingMethodDetails", ""),
                         attachments = readAttachments(item.optJSONArray("attachments")),
                         paymentRequests = readPaymentRequests(item.optJSONArray("paymentRequests"))
                     )
@@ -3158,20 +3208,34 @@ fun PaymentPlanFinancing(viewModel: FinanceViewModel, kind: String, id: String, 
             InfoRow("Seller / provider", emi.seller)
             InfoRow("Agreement reference", emi.agreementReference)
             InfoRow("Notes", emi.financingNotes)
+            FinancingMethodInfo(emi.financingChannel, emi.financingAccountName, emi.financingAccountNumber, emi.financingBranch, emi.financingRoutingNumber, emi.financingReference, emi.financingMethodDetails)
         } else if (loan != null) {
             InfoRow("Source", loan.financingSource)
             InfoRow("How received", loan.receivedMethod)
             InfoRow("Lender", loan.lender)
             InfoRow("Agreement reference", loan.agreementReference)
             InfoRow("Notes", loan.financingNotes)
+            FinancingMethodInfo(loan.financingChannel, loan.financingAccountName, loan.financingAccountNumber, loan.financingBranch, loan.financingRoutingNumber, loan.financingReference, loan.financingMethodDetails)
         } else if (debt != null) {
             InfoRow("Direction", debt.direction)
             InfoRow("Reason", debt.reason)
             InfoRow("How received / given", debt.receivedOrGivenMethod)
             InfoRow("Agreement reference", debt.referenceNumber)
             InfoRow("Notes", debt.notes)
+            FinancingMethodInfo(debt.financingChannel, debt.financingAccountName, debt.financingAccountNumber, debt.financingBranch, debt.financingRoutingNumber, debt.financingReference, debt.financingMethodDetails)
         } else Text("Record not found.")
     }
+}
+
+@Composable
+private fun FinancingMethodInfo(channel: String, accountName: String, accountNumber: String, branch: String, routing: String, reference: String, details: String) {
+    if (channel.isNotBlank()) InfoRow("Provider / bank", channel)
+    if (accountName.isNotBlank()) InfoRow("Account holder / party", accountName)
+    if (accountNumber.isNotBlank()) InfoRow("Account / mobile number", accountNumber)
+    if (branch.isNotBlank()) InfoRow("Branch", branch)
+    if (routing.isNotBlank()) InfoRow("Routing number", routing)
+    if (reference.isNotBlank()) InfoRow("Transaction reference", reference)
+    if (details.isNotBlank()) InfoRow("Method details", details)
 }
 
 @Composable
@@ -5243,6 +5307,16 @@ fun PaymentEditDialog(
 // EMI FORM
 // ============================================================
 
+private val EmiCategoryOptions = listOf(
+    "Electronics", "Appliances", "Furniture", "Vehicle", "Mobile / Computer",
+    "Education", "Medical", "Home Improvement", "Other"
+)
+
+private val LoanTypeOptions = listOf(
+    "Personal Loan", "Bank Loan", "Office Loan", "Salary Loan", "Home Loan",
+    "Vehicle Loan", "Education Loan", "Business Loan", "Other"
+)
+
 @Composable
 fun EmiForm(
     viewModel: FinanceViewModel,
@@ -5264,6 +5338,9 @@ fun EmiForm(
             existing?.category ?: "Electronics"
         )
     }
+    var categoryChoice by remember(existing?.id) {
+        mutableStateOf(if ((existing?.category ?: "Electronics") in EmiCategoryOptions.dropLast(1)) existing?.category ?: "Electronics" else "Other")
+    }
 
     var seller by remember {
         mutableStateOf(
@@ -5275,6 +5352,13 @@ fun EmiForm(
     var receivedMethod by remember { mutableStateOf(existing?.receivedMethod ?: "Direct purchase financing") }
     var agreementReference by remember { mutableStateOf(existing?.agreementReference ?: "") }
     var financingNotes by remember { mutableStateOf(existing?.financingNotes ?: "") }
+    var financingChannel by remember { mutableStateOf(existing?.financingChannel ?: "") }
+    var financingAccountName by remember { mutableStateOf(existing?.financingAccountName ?: "") }
+    var financingAccountNumber by remember { mutableStateOf(existing?.financingAccountNumber ?: "") }
+    var financingBranch by remember { mutableStateOf(existing?.financingBranch ?: "") }
+    var financingRouting by remember { mutableStateOf(existing?.financingRoutingNumber ?: "") }
+    var financingReference by remember { mutableStateOf(existing?.financingReference ?: "") }
+    var financingMethodDetails by remember { mutableStateOf(existing?.financingMethodDetails ?: "") }
     var attachments by remember { mutableStateOf(existing?.attachments ?: emptyList()) }
 
     var price by remember {
@@ -5390,6 +5474,10 @@ fun EmiForm(
         receivedMethod != (existing?.receivedMethod ?: "Direct purchase financing") ||
         agreementReference != (existing?.agreementReference ?: "") ||
         financingNotes != (existing?.financingNotes ?: "") ||
+        financingChannel != (existing?.financingChannel ?: "") || financingAccountName != (existing?.financingAccountName ?: "") ||
+        financingAccountNumber != (existing?.financingAccountNumber ?: "") || financingBranch != (existing?.financingBranch ?: "") ||
+        financingRouting != (existing?.financingRoutingNumber ?: "") || financingReference != (existing?.financingReference ?: "") ||
+        financingMethodDetails != (existing?.financingMethodDetails ?: "") ||
         attachments != (existing?.attachments ?: emptyList<Attachment>()) ||
         price != (existing?.price?.toString() ?: "") ||
         downPayment != (existing?.downPayment?.toString() ?: "0") ||
@@ -5434,12 +5522,11 @@ fun EmiForm(
             name = it
         }
 
-        Field(
-            "Category",
-            category
-        ) {
-            category = it
+        ChoiceDropdown("Category", categoryChoice, EmiCategoryOptions) { selected ->
+            categoryChoice = selected
+            if (selected != "Other") category = selected else if (category in EmiCategoryOptions) category = ""
         }
+        if (categoryChoice == "Other") Field("Custom category", category) { category = it }
 
         Field(
             "Seller / Provider",
@@ -5458,7 +5545,16 @@ fun EmiForm(
             "How item/finance was received",
             receivedMethod,
             listOf("Direct purchase financing", "Cash", "Bank transfer", "Mobile banking", "Salary arrangement", "Other")
-        ) { receivedMethod = it }
+        ) {
+            receivedMethod = it; financingChannel = ""; financingAccountName = ""; financingAccountNumber = ""
+            financingBranch = ""; financingRouting = ""; financingReference = ""; financingMethodDetails = ""
+        }
+        PaymentMethodDetailsFields(
+            receivedMethod, financingChannel, { financingChannel = it }, financingAccountName, { financingAccountName = it },
+            financingAccountNumber, { financingAccountNumber = it }, financingBranch, { financingBranch = it },
+            financingRouting, { financingRouting = it }, financingReference, { financingReference = it },
+            financingMethodDetails, { financingMethodDetails = it }
+        )
         Field("Agreement / reference number", agreementReference) { agreementReference = it }
         Field("Financing notes", financingNotes) { financingNotes = it }
         AttachmentSection(attachments, maxFiles = 5) { attachments = it }
@@ -5588,6 +5684,9 @@ fun EmiForm(
 
                     category.trim().length !in 2..60 || seller.trim().length > 100 ->
                         "Enter a valid category; seller/provider must be 100 characters or less."
+
+                    paymentMethodValidation(receivedMethod, financingChannel.ifBlank { if (receivedMethod == "Mobile banking") defaultProvider() else if (receivedMethod == "Bank transfer") defaultBank() else "" }, financingAccountName, financingAccountNumber, financingReference, financingMethodDetails).isNotBlank() ->
+                        paymentMethodValidation(receivedMethod, financingChannel.ifBlank { if (receivedMethod == "Mobile banking") defaultProvider() else if (receivedMethod == "Bank transfer") defaultBank() else "" }, financingAccountName, financingAccountNumber, financingReference, financingMethodDetails)
 
                     !purchasePrice.isFinite() || purchasePrice <= 0 || purchasePrice > 999_999_999.99 ->
                         "Enter a valid price."
@@ -5739,6 +5838,10 @@ fun EmiForm(
                             receivedMethod = receivedMethod,
                             agreementReference = agreementReference.trim(),
                             financingNotes = financingNotes.trim(),
+                            financingChannel = financingChannel.ifBlank { if (receivedMethod == "Mobile banking") defaultProvider() else if (receivedMethod == "Bank transfer") defaultBank() else "" },
+                            financingAccountName = financingAccountName.trim(), financingAccountNumber = financingAccountNumber.trim(),
+                            financingBranch = financingBranch.trim(), financingRoutingNumber = financingRouting.trim(),
+                            financingReference = financingReference.trim(), financingMethodDetails = financingMethodDetails.trim(),
                             attachments = attachments
                         )
 
@@ -5810,6 +5913,9 @@ fun LoanForm(
             existing?.type ?: "Office Loan"
         )
     }
+    var loanTypeChoice by remember(existing?.id) {
+        mutableStateOf(if ((existing?.type ?: "Office Loan") in LoanTypeOptions.dropLast(1)) existing?.type ?: "Office Loan" else "Other")
+    }
 
     var lender by remember {
         mutableStateOf(
@@ -5821,6 +5927,13 @@ fun LoanForm(
     var receivedMethod by remember { mutableStateOf(existing?.receivedMethod ?: "Bank transfer") }
     var agreementReference by remember { mutableStateOf(existing?.agreementReference ?: "") }
     var financingNotes by remember { mutableStateOf(existing?.financingNotes ?: "") }
+    var financingChannel by remember { mutableStateOf(existing?.financingChannel ?: "") }
+    var financingAccountName by remember { mutableStateOf(existing?.financingAccountName ?: "") }
+    var financingAccountNumber by remember { mutableStateOf(existing?.financingAccountNumber ?: "") }
+    var financingBranch by remember { mutableStateOf(existing?.financingBranch ?: "") }
+    var financingRouting by remember { mutableStateOf(existing?.financingRoutingNumber ?: "") }
+    var financingReference by remember { mutableStateOf(existing?.financingReference ?: "") }
+    var financingMethodDetails by remember { mutableStateOf(existing?.financingMethodDetails ?: "") }
     var attachments by remember { mutableStateOf(existing?.attachments ?: emptyList()) }
 
     var principal by remember {
@@ -5954,6 +6067,10 @@ fun LoanForm(
         receivedMethod != (existing?.receivedMethod ?: "Bank transfer") ||
         agreementReference != (existing?.agreementReference ?: "") ||
         financingNotes != (existing?.financingNotes ?: "") ||
+        financingChannel != (existing?.financingChannel ?: "") || financingAccountName != (existing?.financingAccountName ?: "") ||
+        financingAccountNumber != (existing?.financingAccountNumber ?: "") || financingBranch != (existing?.financingBranch ?: "") ||
+        financingRouting != (existing?.financingRoutingNumber ?: "") || financingReference != (existing?.financingReference ?: "") ||
+        financingMethodDetails != (existing?.financingMethodDetails ?: "") ||
         attachments != (existing?.attachments ?: emptyList<Attachment>()) ||
         principal != (existing?.principal?.toString() ?: "") ||
         rate != (existing?.interestRate?.toString() ?: "0") ||
@@ -5999,12 +6116,11 @@ fun LoanForm(
             name = it
         }
 
-        Field(
-            "Loan type",
-            type
-        ) {
-            type = it
+        ChoiceDropdown("Loan type", loanTypeChoice, LoanTypeOptions) { selected ->
+            loanTypeChoice = selected
+            if (selected != "Other") type = selected else if (type in LoanTypeOptions) type = ""
         }
+        if (loanTypeChoice == "Other") Field("Custom loan type", type) { type = it }
 
         Field(
             "Lender",
@@ -6023,7 +6139,16 @@ fun LoanForm(
             "How the loan was received",
             receivedMethod,
             listOf("Cash", "Bank transfer", "Mobile banking", "Salary arrangement", "Direct financing", "Other")
-        ) { receivedMethod = it }
+        ) {
+            receivedMethod = it; financingChannel = ""; financingAccountName = ""; financingAccountNumber = ""
+            financingBranch = ""; financingRouting = ""; financingReference = ""; financingMethodDetails = ""
+        }
+        PaymentMethodDetailsFields(
+            receivedMethod, financingChannel, { financingChannel = it }, financingAccountName, { financingAccountName = it },
+            financingAccountNumber, { financingAccountNumber = it }, financingBranch, { financingBranch = it },
+            financingRouting, { financingRouting = it }, financingReference, { financingReference = it },
+            financingMethodDetails, { financingMethodDetails = it }
+        )
         Field("Agreement / reference number", agreementReference) { agreementReference = it }
         Field("Financing notes", financingNotes) { financingNotes = it }
         AttachmentSection(attachments, maxFiles = 5) { attachments = it }
@@ -6164,6 +6289,9 @@ fun LoanForm(
 
                     type.trim().length !in 2..60 || lender.trim().length > 100 ->
                         "Enter a valid loan type; lender must be 100 characters or less."
+
+                    paymentMethodValidation(receivedMethod, financingChannel.ifBlank { if (receivedMethod == "Mobile banking") defaultProvider() else if (receivedMethod == "Bank transfer") defaultBank() else "" }, financingAccountName, financingAccountNumber, financingReference, financingMethodDetails).isNotBlank() ->
+                        paymentMethodValidation(receivedMethod, financingChannel.ifBlank { if (receivedMethod == "Mobile banking") defaultProvider() else if (receivedMethod == "Bank transfer") defaultBank() else "" }, financingAccountName, financingAccountNumber, financingReference, financingMethodDetails)
 
                     !principalAmount.isFinite() || principalAmount <= 0 || principalAmount > 999_999_999.99 ->
                         "Enter principal."
@@ -6311,6 +6439,10 @@ fun LoanForm(
                             receivedMethod = receivedMethod,
                             agreementReference = agreementReference.trim(),
                             financingNotes = financingNotes.trim(),
+                            financingChannel = financingChannel.ifBlank { if (receivedMethod == "Mobile banking") defaultProvider() else if (receivedMethod == "Bank transfer") defaultBank() else "" },
+                            financingAccountName = financingAccountName.trim(), financingAccountNumber = financingAccountNumber.trim(),
+                            financingBranch = financingBranch.trim(), financingRoutingNumber = financingRouting.trim(),
+                            financingReference = financingReference.trim(), financingMethodDetails = financingMethodDetails.trim(),
                             attachments = attachments
                         )
 
@@ -6402,6 +6534,13 @@ fun DebtForm(
     var dueDate by remember { mutableStateOf(existing?.dueDate?.let(::expenseDateText) ?: "") }
     var receivedOrGivenMethod by remember { mutableStateOf(existing?.receivedOrGivenMethod ?: "Cash") }
     var debtReference by remember { mutableStateOf(existing?.referenceNumber ?: "") }
+    var financingChannel by remember { mutableStateOf(existing?.financingChannel ?: "") }
+    var financingAccountName by remember { mutableStateOf(existing?.financingAccountName ?: "") }
+    var financingAccountNumber by remember { mutableStateOf(existing?.financingAccountNumber ?: "") }
+    var financingBranch by remember { mutableStateOf(existing?.financingBranch ?: "") }
+    var financingRouting by remember { mutableStateOf(existing?.financingRoutingNumber ?: "") }
+    var financingReference by remember { mutableStateOf(existing?.financingReference ?: "") }
+    var financingMethodDetails by remember { mutableStateOf(existing?.financingMethodDetails ?: "") }
     var attachments by remember { mutableStateOf(existing?.attachments ?: emptyList()) }
 
     var payment by remember {
@@ -6433,6 +6572,10 @@ fun DebtForm(
         dueDate != (existing?.dueDate?.let(::expenseDateText) ?: "") ||
         receivedOrGivenMethod != (existing?.receivedOrGivenMethod ?: "Cash") ||
         debtReference != (existing?.referenceNumber ?: "") ||
+        financingChannel != (existing?.financingChannel ?: "") || financingAccountName != (existing?.financingAccountName ?: "") ||
+        financingAccountNumber != (existing?.financingAccountNumber ?: "") || financingBranch != (existing?.financingBranch ?: "") ||
+        financingRouting != (existing?.financingRoutingNumber ?: "") || financingReference != (existing?.financingReference ?: "") ||
+        financingMethodDetails != (existing?.financingMethodDetails ?: "") ||
         attachments != (existing?.attachments ?: emptyList<Attachment>()) ||
         payment.isNotBlank() ||
         previousPayment.isNotBlank()
@@ -6503,7 +6646,16 @@ fun DebtForm(
             if (direction == "I Owe") "How you received it" else "How you gave it",
             receivedOrGivenMethod,
             listOf("Cash", "Bank transfer", "Mobile banking", "Goods or service", "Other")
-        ) { receivedOrGivenMethod = it }
+        ) {
+            receivedOrGivenMethod = it; financingChannel = ""; financingAccountName = ""; financingAccountNumber = ""
+            financingBranch = ""; financingRouting = ""; financingReference = ""; financingMethodDetails = ""
+        }
+        PaymentMethodDetailsFields(
+            receivedOrGivenMethod, financingChannel, { financingChannel = it }, financingAccountName, { financingAccountName = it },
+            financingAccountNumber, { financingAccountNumber = it }, financingBranch, { financingBranch = it },
+            financingRouting, { financingRouting = it }, financingReference, { financingReference = it },
+            financingMethodDetails, { financingMethodDetails = it }
+        )
         Field("Agreement / reference number", debtReference) { debtReference = it }
         AttachmentSection(attachments, maxFiles = 5) { attachments = it }
 
@@ -6592,7 +6744,8 @@ fun DebtForm(
                 OutlinedButton(
                     onClick = {
                         val updatedAmount = amount.toDoubleOrNull() ?: 0.0
-                        if (name.isBlank() || name.trim().length > 100 || !updatedAmount.isFinite() || updatedAmount <= 0 || updatedAmount > 999_999_999.99 || updatedAmount + 0.005 < paid || notes.length > 500 || debtReference.length > 100) {
+                        val financingValidation = paymentMethodValidation(receivedOrGivenMethod, financingChannel.ifBlank { if (receivedOrGivenMethod == "Mobile banking") defaultProvider() else if (receivedOrGivenMethod == "Bank transfer") defaultBank() else "" }, financingAccountName, financingAccountNumber, financingReference, financingMethodDetails)
+                        if (name.isBlank() || name.trim().length > 100 || !updatedAmount.isFinite() || updatedAmount <= 0 || updatedAmount > 999_999_999.99 || updatedAmount + 0.005 < paid || notes.length > 500 || debtReference.length > 100 || financingValidation.isNotBlank()) {
                             paymentError = "Enter a valid name and an original amount not below the recorded total."
                         } else {
                             pendingDebtUpdate = ConfirmationRequest(
@@ -6611,6 +6764,10 @@ fun DebtForm(
                                             reason = reason.trim(),
                                             receivedOrGivenMethod = receivedOrGivenMethod,
                                             referenceNumber = debtReference.trim(),
+                                            financingChannel = financingChannel.ifBlank { if (receivedOrGivenMethod == "Mobile banking") defaultProvider() else if (receivedOrGivenMethod == "Bank transfer") defaultBank() else "" },
+                                            financingAccountName = financingAccountName.trim(), financingAccountNumber = financingAccountNumber.trim(),
+                                            financingBranch = financingBranch.trim(), financingRoutingNumber = financingRouting.trim(),
+                                            financingReference = financingReference.trim(), financingMethodDetails = financingMethodDetails.trim(),
                                             attachments = attachments
                                         )
                                     )
@@ -6760,13 +6917,14 @@ fun DebtForm(
                     val previousAmount = previousPayment.toDoubleOrNull() ?: 0.0
                     val selectedDebtDate = parseExpenseDate(debtDate)
                     val selectedDueDate = if (dueDate.isBlank()) null else parseExpenseDate(dueDate)
+                    val financingValidation = paymentMethodValidation(receivedOrGivenMethod, financingChannel.ifBlank { if (receivedOrGivenMethod == "Mobile banking") defaultProvider() else if (receivedOrGivenMethod == "Bank transfer") defaultBank() else "" }, financingAccountName, financingAccountNumber, financingReference, financingMethodDetails)
 
                     if (
                         name.isBlank() || name.trim().length > 100 || notes.length > 500 || debtReference.length > 100 ||
                         !originalAmount.isFinite() || originalAmount <= 0 || originalAmount > 999_999_999.99 ||
                         !previousAmount.isFinite() || previousAmount < 0 ||
                         previousAmount > originalAmount || selectedDebtDate == null || (dueDate.isNotBlank() && selectedDueDate == null) ||
-                        (selectedDueDate != null && selectedDebtDate != null && selectedDueDate < selectedDebtDate)
+                        (selectedDueDate != null && selectedDebtDate != null && selectedDueDate < selectedDebtDate) || financingValidation.isNotBlank()
                     ) {
 
                         error =
@@ -6789,6 +6947,10 @@ fun DebtForm(
                                 reason = reason.trim(),
                                 receivedOrGivenMethod = receivedOrGivenMethod,
                                 referenceNumber = debtReference.trim(),
+                                financingChannel = financingChannel.ifBlank { if (receivedOrGivenMethod == "Mobile banking") defaultProvider() else if (receivedOrGivenMethod == "Bank transfer") defaultBank() else "" },
+                                financingAccountName = financingAccountName.trim(), financingAccountNumber = financingAccountNumber.trim(),
+                                financingBranch = financingBranch.trim(), financingRoutingNumber = financingRouting.trim(),
+                                financingReference = financingReference.trim(), financingMethodDetails = financingMethodDetails.trim(),
                                 attachments = attachments,
                                 payments = if (previousAmount > 0) {
                                     listOf(Payment(1, System.currentTimeMillis(), previousAmount, System.currentTimeMillis()))
@@ -7439,7 +7601,7 @@ fun AboutScreen(done: () -> Unit) {
                 modifier = Modifier.size(112.dp)
             )
             Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Version 8.0")
+            Text("Version 8.3")
             Spacer(Modifier.height(8.dp))
             Text("Created and owned by", color = MaterialTheme.colorScheme.secondary)
             Text("Md. Zahid Alam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -7560,6 +7722,26 @@ private fun availableProviders(): List<String> =
 private fun defaultBank() = availableBanks().firstOrNull() ?: "Other bank"
 private fun defaultProvider() = availableProviders().firstOrNull() ?: "Other provider"
 
+private fun rememberCustomBank(context: Context, enteredName: String): String? {
+    val name = enteredName.trim().replace(Regex("\\s+"), " ")
+    if (name.length !in 2..100 || name.equals("Other bank", ignoreCase = true)) return null
+    availableBanks().firstOrNull { it.equals(name, ignoreCase = true) }?.let { return it }
+    val updated = (AppLocaleState.customBanks + name).distinctBy { it.lowercase(Locale.US) }.sortedBy { it.lowercase(Locale.US) }
+    AppLocaleState.customBanks = updated
+    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putStringSet(KEY_CUSTOM_BANKS, updated.toSet()).apply()
+    return name
+}
+
+@Composable
+private fun SaveCustomBankAction(bankName: String, onSaved: (String) -> Unit) {
+    val context = LocalContext.current
+    OutlinedButton(
+        onClick = { rememberCustomBank(context, bankName)?.let(onSaved) },
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !LocalFormReadOnly.current && bankName.trim().length in 2..100
+    ) { Text("Save this bank for future use") }
+}
+
 @Composable
 private fun SearchableBankPicker(value: String, onSelect: (String) -> Unit) {
     var visible by remember { mutableStateOf(false) }
@@ -7616,7 +7798,10 @@ fun PaymentMethodDetailsFields(
         }
         "Bank transfer" -> {
             SearchableBankPicker(channel.ifBlank { defaultBank() }, onChannel)
-            if (channel == "Other bank") Field("Other bank name", methodDetails, onChange = onMethodDetails)
+            if (channel == "Other bank") {
+                Field("Other bank name", methodDetails, onChange = onMethodDetails)
+                SaveCustomBankAction(methodDetails, onChannel)
+            }
             Field("Account holder", accountName, onChange = onAccountName)
             Field("Account number", accountNumber, onChange = onAccountNumber)
             Field("Branch (optional)", branch, onChange = onBranch)
@@ -7625,11 +7810,14 @@ fun PaymentMethodDetailsFields(
         }
         "Cheque" -> {
             SearchableBankPicker(channel.ifBlank { defaultBank() }, onChannel)
-            if (channel == "Other bank") Field("Other bank name", methodDetails, onChange = onMethodDetails)
+            if (channel == "Other bank") {
+                Field("Other bank name", methodDetails, onChange = onMethodDetails)
+                SaveCustomBankAction(methodDetails, onChannel)
+            }
             Field("Cheque number", reference, onChange = onReference)
             Field("Account holder (optional)", accountName, onChange = onAccountName)
         }
-        "Salary deduction" -> {
+        "Salary deduction", "Salary arrangement" -> {
             Field("Employer", accountName, onChange = onAccountName)
             Field("Salary month", methodDetails, onChange = onMethodDetails)
             Field("Reference (optional)", reference, onChange = onReference)
@@ -7663,7 +7851,7 @@ private fun paymentMethodValidation(
     method == "Bank transfer" && accountName.isBlank() -> "Enter the account holder name."
     method == "Bank transfer" && accountNumber.isBlank() -> "Enter the account number."
     method == "Cheque" && (channel.isBlank() || reference.isBlank()) -> "Select the bank and enter the cheque number."
-    method == "Salary deduction" && (accountName.isBlank() || methodDetails.isBlank()) -> "Enter the employer and salary month."
+    method in listOf("Salary deduction", "Salary arrangement") && (accountName.isBlank() || methodDetails.isBlank()) -> "Enter the employer and salary month."
     method == "Card" && (!Regex("^[0-9]{4}$").matches(accountNumber) || reference.isBlank()) -> "Enter the card's last four digits and transaction ID."
     method == "Other" && methodDetails.isBlank() -> "Enter the payment method name."
     else -> ""
@@ -8180,6 +8368,12 @@ fun buildEmiReport(
         appendLine("Item: ${item.name}")
         appendLine("Category: ${item.category}")
         appendLine("Seller: ${item.seller}")
+        appendLine("Financing source: ${item.financingSource}")
+        appendLine("How received: ${item.receivedMethod}")
+        if (item.financingChannel.isNotBlank()) appendLine("Provider / bank: ${item.financingChannel}")
+        if (item.financingAccountName.isNotBlank()) appendLine("Account holder / party: ${item.financingAccountName}")
+        if (item.financingAccountNumber.isNotBlank()) appendLine("Account / mobile number: ${item.financingAccountNumber}")
+        if (item.financingReference.isNotBlank()) appendLine("Transaction reference: ${item.financingReference}")
 
         appendLine(
             "Price: ${money(item.price)}"
@@ -8277,6 +8471,12 @@ fun buildLoanReport(
         appendLine("Loan: ${item.name}")
         appendLine("Type: ${item.type}")
         appendLine("Lender: ${item.lender}")
+        appendLine("Financing source: ${item.financingSource}")
+        appendLine("How received: ${item.receivedMethod}")
+        if (item.financingChannel.isNotBlank()) appendLine("Provider / bank: ${item.financingChannel}")
+        if (item.financingAccountName.isNotBlank()) appendLine("Account holder / party: ${item.financingAccountName}")
+        if (item.financingAccountNumber.isNotBlank()) appendLine("Account / mobile number: ${item.financingAccountNumber}")
+        if (item.financingReference.isNotBlank()) appendLine("Transaction reference: ${item.financingReference}")
 
         appendLine(
             "Principal: ${money(item.principal)}"
@@ -8365,6 +8565,11 @@ fun buildDebtReport(
         appendLine(
             "Direction: ${item.direction}"
         )
+        appendLine("How received / given: ${item.receivedOrGivenMethod}")
+        if (item.financingChannel.isNotBlank()) appendLine("Provider / bank: ${item.financingChannel}")
+        if (item.financingAccountName.isNotBlank()) appendLine("Account holder / party: ${item.financingAccountName}")
+        if (item.financingAccountNumber.isNotBlank()) appendLine("Account / mobile number: ${item.financingAccountNumber}")
+        if (item.financingReference.isNotBlank()) appendLine("Transaction reference: ${item.financingReference}")
 
         appendLine(
             "Original amount: ${
@@ -8471,9 +8676,9 @@ fun writeXlsxToUri(context: Context, uri: android.net.Uri, data: FinanceData, pe
     )
     val sheets = listOf(
         localized("Summary") to sheet(listOf("Metric", "Value"), summaryRows),
-        localized("EMI") to sheet(listOf("Item", "Category", "Seller", "Price", "Down Payment", "Financed", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.emis.map { listOf(it.name, it.category, it.seller, XlsxMoney(it.price), XlsxMoney(it.downPayment), XlsxMoney(it.financedAmount), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (emiCompleted(it)) "Completed" else "Active") }),
-        localized("Loans") to sheet(listOf("Loan", "Type", "Lender", "Principal", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.loans.map { listOf(it.name, it.type, it.lender, XlsxMoney(it.principal), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (loanCompleted(it)) "Completed" else "Active") }),
-        localized("Debts") to sheet(listOf("Person / Organization", "Direction", "Debt Date", "Original", "Paid / Received", "Remaining", "Due Date", "Reason", "Reference", "Status"), data.debts.map { listOf(it.name, it.direction, dateText(it.debtDate), XlsxMoney(it.originalAmount), XlsxMoney(debtPaidAmount(it)), XlsxMoney(debtRemainingAmount(it)), it.dueDate?.let { value -> dateText(value) } ?: "", it.reason, it.referenceNumber, if (it.archived) "Archived" else if (debtCompleted(it)) "Completed" else "Active") }),
+        localized("EMI") to sheet(listOf("Item", "Category", "Seller", "Financing Source", "Received Method", "Provider / Bank", "Account Holder", "Account / Mobile", "Transaction Reference", "Price", "Down Payment", "Financed", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.emis.map { listOf(it.name, it.category, it.seller, it.financingSource, it.receivedMethod, it.financingChannel, it.financingAccountName, it.financingAccountNumber, it.financingReference, XlsxMoney(it.price), XlsxMoney(it.downPayment), XlsxMoney(it.financedAmount), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (emiCompleted(it)) "Completed" else "Active") }),
+        localized("Loans") to sheet(listOf("Loan", "Type", "Lender", "Financing Source", "Received Method", "Provider / Bank", "Account Holder", "Account / Mobile", "Transaction Reference", "Principal", "Interest %", "Total Payable", "Installments", "Monthly", "Start Date", "Status"), data.loans.map { listOf(it.name, it.type, it.lender, it.financingSource, it.receivedMethod, it.financingChannel, it.financingAccountName, it.financingAccountNumber, it.financingReference, XlsxMoney(it.principal), XlsxNumber(it.interestRate), XlsxMoney(it.totalPayable), XlsxNumber(it.installments), XlsxMoney(it.monthlyPayment), dateText(it.startDate), if (it.archived) "Archived" else if (loanCompleted(it)) "Completed" else "Active") }),
+        localized("Debts") to sheet(listOf("Person / Organization", "Direction", "Debt Date", "Received / Given Method", "Provider / Bank", "Account Holder", "Account / Mobile", "Transaction Reference", "Original", "Paid / Received", "Remaining", "Due Date", "Reason", "Reference", "Status"), data.debts.map { listOf(it.name, it.direction, dateText(it.debtDate), it.receivedOrGivenMethod, it.financingChannel, it.financingAccountName, it.financingAccountNumber, it.financingReference, XlsxMoney(it.originalAmount), XlsxMoney(debtPaidAmount(it)), XlsxMoney(debtRemainingAmount(it)), it.dueDate?.let { value -> dateText(value) } ?: "", it.reason, it.referenceNumber, if (it.archived) "Archived" else if (debtCompleted(it)) "Completed" else "Active") }),
         localized("Expenses") to sheet(listOf("Date", "Expense", "Category", "Amount", "Notes"), data.expenses.map { listOf(expenseDayKey(it.date), it.title, it.category, XlsxMoney(it.amount), it.notes) }),
         localized("Payments") to sheet(listOf("Record Type", "Record", "Payment No.", "Due Date", "Paid Date", "Amount", "Status", "Method", "Provider / Bank", "Reference", "Party", "Account", "Branch", "Routing", "Details", "Notes"), buildList {
             data.emis.forEach { plan -> plan.payments.forEach { p -> add(listOf("EMI", plan.name, XlsxNumber(p.number), dateText(p.dueDate), p.paidDate?.let { dateText(it) } ?: "", XlsxMoney(p.amount), p.status, p.paymentMethod, p.paymentChannel, p.referenceNumber, p.counterparty, p.accountNumber, p.branch, p.routingNumber, p.methodDetails, p.notes)) } }
