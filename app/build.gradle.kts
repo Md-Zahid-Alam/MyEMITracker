@@ -12,8 +12,8 @@ android {
         applicationId = "com.mdzahidalam.myfinancetracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "6.0"
+        versionCode = 20
+        versionName = "6.1"
     }
 
     val stableStorePath = System.getenv("MFT_SIGNING_STORE_FILE")
