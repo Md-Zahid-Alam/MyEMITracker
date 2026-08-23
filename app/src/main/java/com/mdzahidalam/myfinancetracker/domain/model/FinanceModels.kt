@@ -39,6 +39,10 @@ data class EmiItem(
     val reminderDays: List<Int>, val payments: List<Payment>, val archived: Boolean = false,
     val financingSource: String = "", val receivedMethod: String = "",
     val agreementReference: String = "", val financingNotes: String = "",
+    val financingChannel: String = "", val financingAccountName: String = "",
+    val financingAccountNumber: String = "", val financingBranch: String = "",
+    val financingRoutingNumber: String = "", val financingReference: String = "",
+    val financingMethodDetails: String = "",
     val attachments: List<Attachment> = emptyList()
 )
 
@@ -50,6 +54,10 @@ data class Loan(
     val reminderDays: List<Int>, val payments: List<Payment>, val repaymentMode: String = "EQUAL",
     val archived: Boolean = false, val financingSource: String = "", val receivedMethod: String = "",
     val agreementReference: String = "", val financingNotes: String = "",
+    val financingChannel: String = "", val financingAccountName: String = "",
+    val financingAccountNumber: String = "", val financingBranch: String = "",
+    val financingRoutingNumber: String = "", val financingReference: String = "",
+    val financingMethodDetails: String = "",
     val attachments: List<Attachment> = emptyList()
 )
 
@@ -58,6 +66,10 @@ data class Debt(
     val originalAmount: Double, val dueDate: Long?, val notes: String, val payments: List<Payment>,
     val debtDate: Long = System.currentTimeMillis(), val archived: Boolean = false,
     val reason: String = "", val receivedOrGivenMethod: String = "", val referenceNumber: String = "",
+    val financingChannel: String = "", val financingAccountName: String = "",
+    val financingAccountNumber: String = "", val financingBranch: String = "",
+    val financingRoutingNumber: String = "", val financingReference: String = "",
+    val financingMethodDetails: String = "",
     val attachments: List<Attachment> = emptyList(),
     val paymentRequests: List<PaymentRequest> = emptyList()
 )
