@@ -1,8 +1,30 @@
-# My Finance Tracker — Version 8.0
+# My Finance Tracker — Version 8.3
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
 
-## Version 8.0 updates
+## Version 8.3 updates
+
+- An `Other bank` entry can now be saved for future use directly from a financing or payment form.
+- Saved banks immediately become available in later bank selectors.
+- Duplicate names are prevented without case sensitivity and extra spaces are normalized.
+- Saved institutions remain private local settings and are included in encrypted backups through their records.
+
+## Earlier Version 8.2 updates
+
+- Connected country-aware bank and mobile-banking controls to EMI, Loan and Debt financing forms.
+- Bangladesh uses the built-in bank list and bKash, Nagad, Rocket and Upay.
+- International profiles use only saved custom institutions plus an Other choice.
+- Added account, branch, routing and transaction-reference fields based on the selected method.
+- Financing details persist in encrypted data/backups and appear in information and exported reports.
+
+## Earlier Version 8.1 updates
+
+- EMI Category is now a clear dropdown with common categories and a custom option.
+- Loan Type is now a clear dropdown with common loan types and a custom option.
+- Existing custom values remain supported and editable.
+- All new choices include Bangla translations.
+
+## Earlier Version 8.0 updates
 
 - Added the Calm Financial premium light/dark color system and a complete typography hierarchy.
 - Redesigned Home with a monthly-spending hero, clearer commitments and refined recent expenses.
@@ -79,4 +101,4 @@ The GitHub Actions workflow requires two repository secrets:
 - `MFT_SIGNING_KEY_BASE64`
 - `MFT_SIGNING_PASSWORD`
 
-The workflow uploads a signed V8.0 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
+The workflow uploads a signed V8.3 release APK and a Play Store AAB. Keep the permanent signing key private and backed up.
