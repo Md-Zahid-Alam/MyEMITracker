@@ -1,0 +1,23 @@
+My Finance Tracker 8.0 — Premium UI update
+
+What changed
+- Introduced a calm, professional finance color system for light and dark mode.
+- Added a complete typography hierarchy, refined shapes, semantic colors and spacing tokens.
+- Removed the redundant permanent app-name bar to give each page more usable space.
+- Redesigned Home with a monthly-spending hero, clearer commitments and refined recent expenses.
+- Redesigned payment category cards with stronger hierarchy and an obvious open affordance.
+- Replaced detail-page outline buttons with compact navigation cards.
+- Improved Settings with clear Language, Security, Data and Documents sections.
+- Improved form headers, field density, dropdowns and date controls.
+- Added centered maximum content widths for larger Android displays.
+- Improved login/setup width, scrolling and theme-aware presentation.
+- Updated About and GitHub artifact names to Version 8.0.
+
+Compatibility
+- Application ID remains com.mdzahidalam.myfinancetracker.
+- Existing encrypted records, attachments and backup formats are unchanged.
+- Use the same permanent signing key to update an earlier signed version.
+
+Build verification
+- GitHub Actions runs unit tests and creates the signed APK and AAB.
+- The source was statically checked locally; an Android SDK/Gradle runtime was not available locally.

@@ -1,5 +1,18 @@
 # Finance design system
 
+Version 8.0 uses the **Calm Financial** direction: trustworthy teal, quiet neutral surfaces, strong hierarchy, restrained elevation and accessible semantic status colors.
+
+## Premium component rules
+
+- Main pages own their title; a redundant global title bar is not shown.
+- Hero cards are reserved for the single most important value on a page.
+- Standard cards use low elevation and consistent rounded shapes.
+- Navigation cards contain a title, supporting text and trailing affordance.
+- Selection controls use compact pills and a light teal selected state.
+- Forms use a maximum width of 680 dp and 56 dp minimum controls.
+- Destructive, warning, positive and information states use semantic colors.
+- Large Android windows constrain content width instead of stretching controls edge to edge.
+
 The visual language is defined by `core/designsystem/FinanceDesignSystem.kt`.
 
 - Primary accent: accessible teal.
