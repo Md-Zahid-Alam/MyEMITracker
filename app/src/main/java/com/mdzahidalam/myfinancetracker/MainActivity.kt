@@ -85,6 +85,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -244,16 +246,300 @@ private val BanglaText = mapOf(
     "Change country and currency?" to "দেশ ও মুদ্রা পরিবর্তন করবেন?", "Change" to "পরিবর্তন করুন"
 )
 
+private val BanglaAdditionalText = mapOf(
+    // App identity, login, dashboard and navigation
+    "My Finance Tracker" to "মাই ফাইন্যান্স ট্র্যাকার",
+    "Your private offline finance tracker" to "আপনার ব্যক্তিগত অফলাইন অর্থ ব্যবস্থাপক",
+    "Your financial data stays on this device." to "আপনার আর্থিক তথ্য এই ডিভাইসেই থাকে।",
+    "Powered by Md. Zahid Alam" to "পরিচালনায়: মোঃ জাহিদ আলম",
+    "Financial Overview" to "আর্থিক সারসংক্ষেপ",
+    "Spent Today" to "আজকের খরচ", "Spent This Month" to "এই মাসের খরচ",
+    "Monthly Payments" to "মাসিক পরিশোধ", "EMI Left" to "বাকি ইএমআই",
+    "Loan Left" to "বাকি ঋণ", "Debt to Pay" to "পরিশোধযোগ্য দেনা",
+    "Money to Receive" to "প্রাপ্য টাকা", "Next Payment" to "পরবর্তী পেমেন্ট",
+    "Recent Expenses" to "সাম্প্রতিক খরচ",
+    "No pending EMI or loan payments." to "কোনো ইএমআই বা ঋণের পেমেন্ট বাকি নেই।",
+    "No expenses recorded yet." to "এখনও কোনো খরচ লেখা হয়নি।",
+    "Choose the type of financial record you want to manage." to "আপনি যে ধরনের আর্থিক রেকর্ড পরিচালনা করতে চান তা বেছে নিন।",
+
+    // General actions, states and messages
+    "Open" to "খুলুন", "Remove" to "সরান", "Export" to "রপ্তানি", "Clear" to "মুছুন",
+    "Clear date" to "তারিখ মুছুন", "Keep editing" to "সম্পাদনা চালিয়ে যান", "Discard" to "বাতিল করুন",
+    "Discard your changes?" to "পরিবর্তনগুলো বাতিল করবেন?", "Your unsaved changes will be lost." to "সংরক্ষণ না করা পরিবর্তনগুলো হারিয়ে যাবে।",
+    "Record not found." to "রেকর্ড পাওয়া যায়নি।", "No supporting documents are attached." to "কোনো সহায়ক ডকুমেন্ট সংযুক্ত নেই।",
+    "There is no pending payment for this plan." to "এই পরিকল্পনায় কোনো পেমেন্ট বাকি নেই।",
+    "This record is view-only. Reopen or restore it from the plan menu before making changes." to "এই রেকর্ডটি শুধু দেখা যাবে। পরিবর্তনের আগে পরিকল্পনা মেনু থেকে পুনরায় খুলুন বা পুনরুদ্ধার করুন।",
+    "This debt is fully completed. No additional payment can be recorded." to "এই দেনা-পাওনা সম্পূর্ণ হয়েছে। আর কোনো পেমেন্ট লেখা যাবে না।",
+    "Open My Finance Tracker to view details." to "বিস্তারিত দেখতে My Finance Tracker খুলুন।",
+
+    // Payments landing and lists
+    "EMI Plans" to "ইএমআই পরিকল্পনা", "Payment Requests" to "পেমেন্ট অনুরোধসমূহ",
+    "Financing details" to "অর্থায়নের বিস্তারিত", "Calculated" to "হিসাবকৃত ফলাফল",
+    "Calculated payments" to "হিসাবকৃত পেমেন্ট", "Financed" to "অর্থায়িত পরিমাণ",
+    "Interest" to "সুদ", "Total payable" to "মোট পরিশোধযোগ্য", "Monthly payment" to "মাসিক পেমেন্ট",
+    "Progress" to "অগ্রগতি", "Remaining" to "বাকি", "Paid / received" to "পরিশোধিত / প্রাপ্ত",
+    "PDF Receipt" to "PDF রসিদ", "Save PDF Receipt" to "PDF রসিদ সংরক্ষণ", "Receipt attached" to "রসিদ সংযুক্ত",
+    "Undo Paid" to "পরিশোধ বাতিল", "Undo Paid?" to "পরিশোধ বাতিল করবেন?",
+    "Edit Plan Information" to "পরিকল্পনার তথ্য সম্পাদনা", "Update Debt Details" to "দেনা-পাওনার তথ্য আপডেট",
+    "Apply payment to" to "পেমেন্ট প্রয়োগ করুন", "Payment notes" to "পেমেন্ট নোট",
+    "Paid date" to "পরিশোধের তারিখ", "Payment date" to "পেমেন্টের তারিখ",
+    "Payment instructions" to "পেমেন্ট নির্দেশনা", "Requested amount" to "অনুরোধকৃত পরিমাণ",
+    "Message" to "বার্তা", "Available to request" to "অনুরোধের জন্য উপলভ্য",
+    "Request money from" to "যার কাছে টাকা চাওয়া হবে", "Cancel Request" to "অনুরোধ বাতিল",
+    "Cancel Payment Request?" to "পেমেন্ট অনুরোধ বাতিল করবেন?",
+
+    // EMI and loan forms
+    "Category" to "ক্যাটাগরি", "Electronics" to "ইলেকট্রনিক্স", "Food" to "খাবার",
+    "Transport" to "যাতায়াত", "Shopping" to "কেনাকাটা", "Bills" to "বিল", "Health" to "স্বাস্থ্য",
+    "Education" to "শিক্ষা", "Entertainment" to "বিনোদন",
+    "Financing source" to "অর্থায়নের উৎস", "How item/finance was received" to "পণ্য/অর্থায়ন যেভাবে পাওয়া হয়েছে",
+    "How the loan was received" to "ঋণ যেভাবে পাওয়া হয়েছে", "Financing notes" to "অর্থায়নের নোট",
+    "Agreement / reference number" to "চুক্তি / রেফারেন্স নম্বর", "Agreement reference" to "চুক্তির রেফারেন্স",
+    "Supporting documents (optional)" to "সহায়ক ডকুমেন্ট (ঐচ্ছিক)", "Attach image or PDF" to "ছবি বা PDF সংযুক্ত করুন",
+    "Documents are included inside encrypted app data and encrypted backups." to "ডকুমেন্টগুলো এনক্রিপ্টেড অ্যাপ ডেটা ও এনক্রিপ্টেড ব্যাকআপের মধ্যে রাখা হয়।",
+    "Bank" to "ব্যাংক", "Finance company" to "অর্থায়ন প্রতিষ্ঠান", "Employer" to "নিয়োগকর্তা",
+    "Shop or seller" to "দোকান বা বিক্রেতা", "Credit card" to "ক্রেডিট কার্ড", "Friend or family" to "বন্ধু বা পরিবার",
+    "Direct purchase financing" to "সরাসরি ক্রয় অর্থায়ন", "Salary arrangement" to "বেতনভিত্তিক ব্যবস্থা", "Goods or service" to "পণ্য বা সেবা",
+    "Loan type" to "ঋণের ধরন", "Office Loan" to "অফিস ঋণ", "Personal Loan" to "ব্যক্তিগত ঋণ", "Bank Loan" to "ব্যাংক ঋণ",
+    "Repayment method" to "পরিশোধ পদ্ধতি", "Equal Installments" to "সমান কিস্তি", "Flexible Monthly Payment" to "পরিবর্তনশীল মাসিক পেমেন্ট",
+    "Installments" to "কিস্তির সংখ্যা", "Planned monthly payment" to "পরিকল্পিত মাসিক পেমেন্ট",
+    "Interest rate %" to "সুদের হার %", "Fixed interest amount" to "নির্দিষ্ট সুদের পরিমাণ",
+    "Due day 1-28" to "পরিশোধের দিন ১-২৮", "Monthly due day 1-28" to "মাসিক পরিশোধের দিন ১-২৮",
+    "Previous installments already paid" to "আগে পরিশোধ করা কিস্তির সংখ্যা", "Previous repayments already made" to "আগে করা পরিশোধের সংখ্যা",
+    "Reminder days before due date (e.g. 7,3,1,0)" to "পরিশোধের তারিখের আগে রিমাইন্ডারের দিন (যেমন ৭,৩,১,০)",
+    "Start date" to "শুরুর তারিখ", "Due day" to "পরিশোধের দিন", "Reminder days" to "রিমাইন্ডারের দিন",
+    "Repayment mode" to "পরিশোধের ধরন", "Principal" to "মূল ঋণ", "Source" to "উৎস",
+    "Save EMI" to "ইএমআই সংরক্ষণ", "Save Loan" to "ঋণ সংরক্ষণ", "Save Debt" to "দেনা-পাওনা সংরক্ষণ",
+
+    // Debt form
+    "Person / organization" to "ব্যক্তি / প্রতিষ্ঠান", "I Owe" to "আমার দেনা", "Owed to Me" to "আমার পাওনা",
+    "You need to pay this person or organization." to "আপনাকে এই ব্যক্তি বা প্রতিষ্ঠানকে টাকা পরিশোধ করতে হবে।",
+    "This person or organization needs to pay you." to "এই ব্যক্তি বা প্রতিষ্ঠান আপনাকে টাকা পরিশোধ করবে।",
+    "Reason for debt" to "দেনা-পাওনার কারণ", "Debt date" to "দেনা-পাওনার তারিখ", "Due date (optional)" to "পরিশোধের তারিখ (ঐচ্ছিক)",
+    "How you received it" to "যেভাবে টাকা পেয়েছেন", "How you gave it" to "যেভাবে টাকা দিয়েছেন",
+    "Previous payment amount (optional)" to "আগের পরিশোধের পরিমাণ (ঐচ্ছিক)",
+    "How received / given" to "যেভাবে পাওয়া / দেওয়া হয়েছে", "Reason" to "কারণ",
+
+    // Expense screens
+    "All Months" to "সব মাস", "All" to "সব", "Category filter: All" to "ক্যাটাগরি ফিল্টার: সব",
+    "Spent this month" to "এই মাসে খরচ", "No expenses for this period. Tap + to add one." to "এই সময়ে কোনো খরচ নেই। যোগ করতে + চাপুন।",
+    "No expenses recorded for this period." to "এই সময়ের জন্য কোনো খরচ লেখা নেই।",
+    "This expense will appear in both daily and monthly summaries." to "এই খরচ দৈনিক ও মাসিক—দুই সারাংশেই দেখাবে।",
+    "Attach image or PDF (0/2)" to "ছবি বা PDF সংযুক্ত করুন (০/২)",
+
+    // Reports
+    "Filtered Summary" to "ফিল্টার করা সারাংশ", "No records match the selected filters." to "নির্বাচিত ফিল্টারের সঙ্গে কোনো রেকর্ড মেলেনি।",
+    "Select period" to "সময়কাল নির্বাচন", "From" to "শুরু", "To" to "শেষ",
+    "Showing one day" to "এক দিনের তথ্য দেখানো হচ্ছে", "Search records" to "রেকর্ড খুঁজুন",
+
+    // Settings, profile and about
+    "Language and appearance" to "ভাষা ও চেহারা", "Country, currency and payment institutions" to "দেশ, মুদ্রা ও পেমেন্ট প্রতিষ্ঠান",
+    "Country and currency" to "দেশ ও মুদ্রা", "Changing currency changes the displayed symbol only; existing amounts are not converted." to "মুদ্রা পরিবর্তন করলে শুধু প্রদর্শিত প্রতীক বদলাবে; আগের টাকার পরিমাণ রূপান্তর হবে না।",
+    "Bangladesh banks and mobile banking services are already included. Add any extra services below." to "বাংলাদেশের ব্যাংক ও মোবাইল ব্যাংকিং সেবাগুলো আগে থেকেই আছে। অতিরিক্ত সেবা নিচে যোগ করুন।",
+    "Add only the banks and payment services you use. They stay on this device." to "আপনি যে ব্যাংক ও পেমেন্ট সেবা ব্যবহার করেন শুধু সেগুলো যোগ করুন। এগুলো এই ডিভাইসেই থাকবে।",
+    "Encrypted backup protects all records and attached documents with a password you choose." to "আপনার নির্বাচিত পাসওয়ার্ড দিয়ে এনক্রিপ্টেড ব্যাকআপ সব রেকর্ড ও সংযুক্ত ডকুমেন্ট সুরক্ষিত রাখে।",
+    "Choose a backup password. You will need it to restore this file on any phone." to "একটি ব্যাকআপ পাসওয়ার্ড দিন। যেকোনো ফোনে ফাইলটি পুনরুদ্ধার করতে এটি লাগবে।",
+    "Backup password" to "ব্যাকআপ পাসওয়ার্ড", "Confirm backup password" to "ব্যাকআপ পাসওয়ার্ড নিশ্চিত করুন",
+    "Current password" to "বর্তমান পাসওয়ার্ড", "New password" to "নতুন পাসওয়ার্ড", "Confirm new password" to "নতুন পাসওয়ার্ড নিশ্চিত করুন",
+    "Your new password replaces the old one securely." to "নতুন পাসওয়ার্ডটি নিরাপদভাবে পুরোনো পাসওয়ার্ডের জায়গায় ব্যবহৃত হবে।",
+    "This identity appears as the issuer on payment receipts and payment requests. App ownership remains separate." to "পেমেন্ট রসিদ ও অনুরোধে এই পরিচয় ইস্যুকারী হিসেবে দেখাবে। অ্যাপের মালিকানা আলাদা থাকবে।",
+    "Signature (optional)" to "স্বাক্ষর (ঐচ্ছিক)", "Signature image (optional)" to "স্বাক্ষরের ছবি (ঐচ্ছিক)", "Attach signature image" to "স্বাক্ষরের ছবি সংযুক্ত করুন",
+    "Save Receipt Profile" to "রসিদ প্রোফাইল সংরক্ষণ", "Created and owned by" to "তৈরি ও মালিকানায়",
+    "A private offline application for tracking EMI plans, loans, debts, and daily expenses." to "ইএমআই, ঋণ, দেনা-পাওনা ও দৈনিক খরচ রাখার একটি ব্যক্তিগত অফলাইন অ্যাপ।",
+    "All rights reserved." to "সর্বস্বত্ব সংরক্ষিত।", "About" to "অ্যাপ সম্পর্কে",
+
+    // Payment method details
+    "Provider name" to "সেবাদাতার নাম", "Other bank name" to "অন্যান্য ব্যাংকের নাম", "Account holder (optional)" to "হিসাবধারী (ঐচ্ছিক)",
+    "Cheque number" to "চেক নম্বর", "Card issuer / bank" to "কার্ড ইস্যুকারী / ব্যাংক", "Last four digits" to "শেষ চার সংখ্যা",
+    "Paid to / received from" to "যাকে দেওয়া / যার কাছ থেকে পাওয়া", "Method name" to "পদ্ধতির নাম", "Salary month" to "বেতনের মাস",
+    "Transaction ID" to "লেনদেন আইডি", "Payment method" to "পেমেন্ট পদ্ধতি",
+
+    // Dialog titles, confirmations and remaining information labels
+    "Archive Debt?" to "দেনা-পাওনা আর্কাইভ করবেন?", "Archive EMI?" to "ইএমআই আর্কাইভ করবেন?", "Archive Loan?" to "ঋণ আর্কাইভ করবেন?",
+    "Edit Debt?" to "দেনা-পাওনা সম্পাদনা করবেন?", "Edit EMI?" to "ইএমআই সম্পাদনা করবেন?", "Edit Loan?" to "ঋণ সম্পাদনা করবেন?",
+    "Edit Expense?" to "খরচ সম্পাদনা করবেন?", "Edit Payment?" to "পেমেন্ট সম্পাদনা করবেন?",
+    "Update Debt?" to "দেনা-পাওনা আপডেট করবেন?", "Update EMI?" to "ইএমআই আপডেট করবেন?", "Update Loan?" to "ঋণ আপডেট করবেন?",
+    "Update Expense?" to "খরচ আপডেট করবেন?", "Update Payment?" to "পেমেন্ট আপডেট করবেন?",
+    "Reopen Debt?" to "দেনা-পাওনা পুনরায় খুলবেন?", "Reopen EMI?" to "ইএমআই পুনরায় খুলবেন?", "Reopen Loan?" to "ঋণ পুনরায় খুলবেন?",
+    "Restore Debt?" to "দেনা-পাওনা পুনরুদ্ধার করবেন?", "Restore EMI?" to "ইএমআই পুনরুদ্ধার করবেন?", "Restore Loan?" to "ঋণ পুনরুদ্ধার করবেন?",
+    "Financed amount" to "অর্থায়িত পরিমাণ", "How received" to "যেভাবে পাওয়া হয়েছে", "Interest amount" to "সুদের পরিমাণ", "Interest rate" to "সুদের হার",
+    "Search expenses" to "খরচ খুঁজুন", "Version 6.0" to "সংস্করণ ৬.০", "Version 6.1" to "সংস্করণ ৬.১", "© 2026 Md. Zahid Alam" to "© ২০২৬ মোঃ জাহিদ আলম",
+    "Md. Zahid Alam" to "মোঃ জাহিদ আলম",
+    "Create an app password. The password itself is not stored; only a protected hash is stored on this phone." to "একটি অ্যাপ পাসওয়ার্ড তৈরি করুন। পাসওয়ার্ডটি সংরক্ষণ করা হয় না; এই ফোনে শুধু এর সুরক্ষিত হ্যাশ রাখা হয়।",
+    "Attach a PNG or JPEG signature image. It is stored with your encrypted app data and added to generated receipts and payment requests." to "PNG বা JPEG স্বাক্ষরের ছবি সংযুক্ত করুন। এটি এনক্রিপ্টেড অ্যাপ ডেটায় রাখা হবে এবং তৈরি করা রসিদ ও পেমেন্ট অনুরোধে যোগ হবে।",
+    "Existing money values will not be converted. Only the country, currency code, symbol, and available payment choices will change." to "আগের টাকার পরিমাণ রূপান্তর হবে না। শুধু দেশ, মুদ্রা কোড, প্রতীক ও উপলভ্য পেমেন্ট পদ্ধতি বদলাবে।",
+    "Changes to installments, previous payments, amounts, or dates may rebuild this EMI payment schedule." to "কিস্তি, আগের পেমেন্ট, পরিমাণ বা তারিখ বদলালে ইএমআই পেমেন্ট সূচি নতুন করে তৈরি হতে পারে।",
+    "Changes to repayments, previous payments, amounts, or dates may rebuild this loan repayment schedule." to "পরিশোধ, আগের পেমেন্ট, পরিমাণ বা তারিখ বদলালে ঋণ পরিশোধ সূচি নতুন করে তৈরি হতে পারে।",
+    "The latest payment will return to Pending and this debt will move back to Active." to "সর্বশেষ পেমেন্ট আবার বাকি হবে এবং দেনা-পাওনাটি চলমান অবস্থায় ফিরবে।",
+    "The latest payment will return to Pending, this EMI will move to Active, and reminders may resume." to "সর্বশেষ পেমেন্ট আবার বাকি হবে, ইএমআই চলমান হবে এবং রিমাইন্ডার পুনরায় চালু হতে পারে।",
+    "The latest repayment will return to Pending, this loan will move to Active, and reminders may resume." to "সর্বশেষ পরিশোধ আবার বাকি হবে, ঋণ চলমান হবে এবং রিমাইন্ডার পুনরায় চালু হতে পারে।",
+    "This debt will leave normal lists, but its complete payment history will remain available." to "দেনা-পাওনাটি সাধারণ তালিকা থেকে সরে যাবে, তবে সম্পূর্ণ পেমেন্ট ইতিহাস থাকবে।",
+    "This debt will return to Active or Completed according to its payment status." to "পেমেন্টের অবস্থা অনুযায়ী দেনা-পাওনাটি চলমান বা সম্পন্ন তালিকায় ফিরবে।",
+    "This EMI will leave normal lists and pending reminders will stop. Its history will remain available." to "ইএমআই সাধারণ তালিকা থেকে সরে যাবে এবং বাকি রিমাইন্ডার বন্ধ হবে। ইতিহাস সংরক্ষিত থাকবে।",
+    "This EMI will return to Active or Completed according to its payment status. Reminders resume if payments are pending." to "পেমেন্টের অবস্থা অনুযায়ী ইএমআই চলমান বা সম্পন্ন তালিকায় ফিরবে। পেমেন্ট বাকি থাকলে রিমাইন্ডার চালু হবে।",
+    "This loan will leave normal lists and pending reminders will stop. Its history will remain available." to "ঋণ সাধারণ তালিকা থেকে সরে যাবে এবং বাকি রিমাইন্ডার বন্ধ হবে। ইতিহাস সংরক্ষিত থাকবে।",
+    "This loan will return to Active or Completed according to its repayment status. Reminders resume if payments are pending." to "পরিশোধের অবস্থা অনুযায়ী ঋণ চলমান বা সম্পন্ন তালিকায় ফিরবে। পেমেন্ট বাকি থাকলে রিমাইন্ডার চালু হবে।",
+    "You are opening an active debt record where payments and notes can be changed." to "আপনি একটি চলমান দেনা-পাওনার রেকর্ড খুলছেন, যেখানে পেমেন্ট ও নোট পরিবর্তন করা যাবে।",
+    "The new values will replace this EMI plan. Changes to amounts, installments, previous payments, or dates may rebuild its payment schedule." to "নতুন মানগুলো এই ইএমআই পরিকল্পনার আগের তথ্য প্রতিস্থাপন করবে। পরিমাণ, কিস্তি, আগের পেমেন্ট বা তারিখ বদলালে পেমেন্ট সূচি নতুন করে তৈরি হতে পারে।",
+    "The new values will replace this loan plan. Changes to amounts, repayments, previous payments, or dates may rebuild its repayment schedule." to "নতুন মানগুলো এই ঋণ পরিকল্পনার আগের তথ্য প্রতিস্থাপন করবে। পরিমাণ, পরিশোধ, আগের পেমেন্ট বা তারিখ বদলালে পরিশোধ সূচি নতুন করে তৈরি হতে পারে।"
+)
+
+private val BanglaValidationText = mapOf(
+    "Enter a backup password." to "একটি ব্যাকআপ পাসওয়ার্ড দিন।", "Incorrect backup password or damaged backup file." to "ব্যাকআপ পাসওয়ার্ড ভুল অথবা ব্যাকআপ ফাইলটি ক্ষতিগ্রস্ত।",
+    "An attached document is damaged." to "সংযুক্ত একটি ডকুমেন্ট ক্ষতিগ্রস্ত।", "Unable to read the selected backup." to "নির্বাচিত ব্যাকআপ পড়া যায়নি।",
+    "Unable to read the backup." to "ব্যাকআপ পড়া যায়নি।", "Use at least 6 characters for the backup password." to "ব্যাকআপ পাসওয়ার্ডে কমপক্ষে ৬টি অক্ষর ব্যবহার করুন।",
+    "Backup passwords do not match." to "ব্যাকআপ পাসওয়ার্ড দুটি মেলেনি।", "Backup could not be created." to "ব্যাকআপ তৈরি করা যায়নি।",
+    "Enter a valid amount greater than zero." to "শূন্যের বেশি একটি সঠিক পরিমাণ দিন।", "Amount is too large." to "পরিমাণটি খুব বড়।",
+    "Select a valid payment date." to "সঠিক পেমেন্টের তারিখ নির্বাচন করুন।", "Payment date cannot be in the future." to "পেমেন্টের তারিখ ভবিষ্যতের হতে পারবে না।",
+    "Enter valid dates as DD-MM-YYYY." to "DD-MM-YYYY বিন্যাসে সঠিক তারিখ দিন।", "Paid date cannot be in the future." to "পরিশোধের তারিখ ভবিষ্যতের হতে পারবে না।",
+    "Select how this payment was made." to "পেমেন্টটি কীভাবে করা হয়েছে তা নির্বাচন করুন।", "Notes must be 500 characters or less; reference and party names must be 100 or less." to "নোট সর্বোচ্চ ৫০০ অক্ষর এবং রেফারেন্স ও পক্ষের নাম সর্বোচ্চ ১০০ অক্ষর হতে হবে।",
+    "Enter item name." to "পণ্যের নাম দিন।", "Item name must be 100 characters or less." to "পণ্যের নাম সর্বোচ্চ ১০০ অক্ষর হতে হবে।",
+    "Enter a valid category; seller/provider must be 100 characters or less." to "সঠিক ক্যাটাগরি দিন; বিক্রেতা/সেবাদাতার নাম সর্বোচ্চ ১০০ অক্ষর হতে হবে।",
+    "Enter a valid price." to "সঠিক মূল্য দিন।", "Interest rate must be 0-100 and interest amount cannot be negative." to "সুদের হার ০-১০০ হতে হবে এবং সুদের পরিমাণ ঋণাত্মক হতে পারবে না।",
+    "Use either interest rate or fixed interest amount, not both." to "সুদের হার অথবা নির্দিষ্ট সুদের পরিমাণ—যেকোনো একটি ব্যবহার করুন, দুটো নয়।",
+    "Installments must be between 1 and 600." to "কিস্তির সংখ্যা ১ থেকে ৬০০-এর মধ্যে হতে হবে।", "Previous paid must be 0 to total installments." to "আগে পরিশোধিত কিস্তি ০ থেকে মোট কিস্তির মধ্যে হতে হবে।",
+    "Due day must be 1-28." to "পরিশোধের দিন ১-২৮-এর মধ্যে হতে হবে।", "Enter at least one reminder day." to "কমপক্ষে একটি রিমাইন্ডারের দিন দিন।",
+    "Enter loan name." to "ঋণের নাম দিন।", "Loan name must be 100 characters or less." to "ঋণের নাম সর্বোচ্চ ১০০ অক্ষর হতে হবে।",
+    "Enter a valid loan type; lender must be 100 characters or less." to "সঠিক ঋণের ধরন দিন; ঋণদাতার নাম সর্বোচ্চ ১০০ অক্ষর হতে হবে।", "Enter principal." to "মূল ঋণের পরিমাণ দিন।",
+    "Enter a valid planned monthly payment." to "সঠিক পরিকল্পিত মাসিক পেমেন্ট দিন।", "Previous repayments must be 0 to total installments." to "আগের পরিশোধের সংখ্যা ০ থেকে মোট কিস্তির মধ্যে হতে হবে।",
+    "Enter reminder days." to "রিমাইন্ডারের দিন দিন।", "Enter a valid name and an original amount not below the recorded total." to "সঠিক নাম এবং রেকর্ডকৃত মোটের চেয়ে কম নয় এমন মূল পরিমাণ দিন।",
+    "Enter a valid payment amount." to "সঠিক পেমেন্টের পরিমাণ দিন।", "Enter a name and valid amount." to "একটি নাম ও সঠিক পরিমাণ দিন।",
+    "Enter a valid requested amount." to "সঠিক অনুরোধকৃত পরিমাণ দিন।", "Request cannot exceed the available receivable balance." to "অনুরোধ প্রাপ্য অবশিষ্ট টাকার বেশি হতে পারবে না।",
+    "Request amount cannot be below the amount already received." to "অনুরোধের পরিমাণ আগে প্রাপ্ত টাকার চেয়ে কম হতে পারবে না।", "Enter a valid due date." to "সঠিক পরিশোধের তারিখ দিন।",
+    "Due date cannot be in the past." to "পরিশোধের তারিখ অতীতের হতে পারবে না।", "Enter payment instructions for the selected method." to "নির্বাচিত পদ্ধতির পেমেন্ট নির্দেশনা দিন।",
+    "Instructions must be 300 characters or less and message 500 or less." to "নির্দেশনা সর্বোচ্চ ৩০০ এবং বার্তা সর্বোচ্চ ৫০০ অক্ষর হতে হবে।",
+    "Enter an expense name." to "খরচের নাম দিন।", "Expense name must be 100 characters or less." to "খরচের নাম সর্বোচ্চ ১০০ অক্ষর হতে হবে।",
+    "Enter a valid date as DD-MM-YYYY." to "DD-MM-YYYY বিন্যাসে সঠিক তারিখ দিন।", "Expense date cannot be in the future." to "খরচের তারিখ ভবিষ্যতের হতে পারবে না।",
+    "Notes must be 500 characters or less." to "নোট সর্বোচ্চ ৫০০ অক্ষর হতে হবে।", "Each document must be 5 MB or smaller." to "প্রতিটি ডকুমেন্ট ৫ MB বা তার কম হতে হবে।",
+    "Unable to read the selected document." to "নির্বাচিত ডকুমেন্ট পড়া যায়নি।", "Enter a valid country name." to "সঠিক দেশের নাম দিন।",
+    "Currency code must contain three letters." to "মুদ্রা কোডে তিনটি অক্ষর থাকতে হবে।", "Enter a currency symbol." to "মুদ্রার প্রতীক দিন।",
+    "Signature must be a PNG, JPEG, or WebP image." to "স্বাক্ষর PNG, JPEG অথবা WebP ছবি হতে হবে।", "Enter your full name." to "আপনার পূর্ণ নাম দিন।",
+    "Full name must be between 2 and 100 characters." to "পূর্ণ নাম ২ থেকে ১০০ অক্ষরের মধ্যে হতে হবে।", "Enter a valid phone number containing 7-15 digits." to "৭-১৫ সংখ্যার একটি সঠিক ফোন নম্বর দিন।",
+    "Enter a valid email address." to "সঠিক ইমেইল ঠিকানা দিন।", "Address must be 250 characters or less." to "ঠিকানা সর্বোচ্চ ২৫০ অক্ষর হতে হবে।",
+    "Enter your current password." to "বর্তমান পাসওয়ার্ড দিন।", "Current password is incorrect." to "বর্তমান পাসওয়ার্ড ভুল।",
+    "Use at least 4 characters." to "কমপক্ষে ৪টি অক্ষর ব্যবহার করুন।", "New passwords do not match." to "নতুন পাসওয়ার্ড দুটি মেলেনি।",
+    "Select a mobile banking provider." to "একটি মোবাইল ব্যাংকিং সেবা নির্বাচন করুন।", "Enter the provider name." to "সেবাদাতার নাম দিন।",
+    "Enter a valid mobile/account number." to "সঠিক মোবাইল/হিসাব নম্বর দিন।", "Select a bank." to "একটি ব্যাংক নির্বাচন করুন।",
+    "Enter the bank name." to "ব্যাংকের নাম দিন।", "Enter the account holder name." to "হিসাবধারীর নাম দিন।", "Enter the account number." to "হিসাব নম্বর দিন।",
+    "Select the bank and enter the cheque number." to "ব্যাংক নির্বাচন করে চেক নম্বর দিন।", "Enter the employer and salary month." to "নিয়োগকর্তা ও বেতনের মাস দিন।",
+    "Enter the card's last four digits and transaction ID." to "কার্ডের শেষ চার সংখ্যা ও লেনদেন আইডি দিন।", "Enter the payment method name." to "পেমেন্ট পদ্ধতির নাম দিন।",
+    "Enter your country name." to "আপনার দেশের নাম দিন।", "Enter a valid currency code and symbol." to "সঠিক মুদ্রা কোড ও প্রতীক দিন।",
+    "Passwords do not match." to "পাসওয়ার্ড দুটি মেলেনি।", "Enter your password." to "আপনার পাসওয়ার্ড দিন।", "Incorrect password." to "পাসওয়ার্ড ভুল।"
+)
+
+private val BanglaUiText2 = mapOf(
+    "Add" to "যোগ করুন", "Attach" to "সংযুক্ত করুন", "Details" to "বিস্তারিত", "Document" to "ডকুমেন্ট", "No documents" to "কোনো ডকুমেন্ট নেই",
+    "emi" to "ইএমআই", "loans" to "ঋণ", "debts" to "দেনা-পাওনা", "expenses" to "খরচ", "records" to "রেকর্ড", "PENDING" to "বাকি",
+    "View Document" to "ডকুমেন্ট দেখুন", "View Documents" to "ডকুমেন্টগুলো দেখুন", "Open My Finance Tracker" to "My Finance Tracker খুলুন",
+    "Plan" to "পরিকল্পনা", "Plan actions" to "পরিকল্পনার কাজ", "View all original plan details" to "পরিকল্পনার মূল তথ্য দেখুন",
+    "Next month" to "পরের মাস", "Previous month" to "আগের মাস", "Next year" to "পরের বছর", "Previous year" to "আগের বছর",
+    "Next due date" to "পরবর্তী পরিশোধের তারিখ", "Spent this day" to "এই দিনের খরচ", "Total spending" to "মোট খরচ",
+    "Total to pay" to "মোট পরিশোধযোগ্য", "Total to receive" to "মোট প্রাপ্য", "Report filters" to "রিপোর্ট ফিল্টার",
+    "No expenses match the current search or category filter." to "বর্তমান খোঁজ বা ক্যাটাগরি ফিল্টারের সঙ্গে কোনো খরচ মেলেনি।",
+    "Hide category summary" to "ক্যাটাগরি সারাংশ লুকান", "Source, method, reference and notes" to "উৎস, পদ্ধতি, রেফারেন্স ও নোট",
+    "Save Changes" to "পরিবর্তন সংরক্ষণ", "Save Expense" to "খরচ সংরক্ষণ", "Save Payment" to "পেমেন্ট সংরক্ষণ",
+    "Save Received Amount" to "প্রাপ্ত টাকা সংরক্ষণ", "Update EMI" to "ইএমআই আপডেট", "Update Loan" to "ঋণ আপডেট", "Update Expense" to "খরচ আপডেট",
+    "Edit Payment Request" to "পেমেন্ট অনুরোধ সম্পাদনা", "Receive Payment" to "পেমেন্ট গ্রহণ", "Share PDF" to "PDF শেয়ার",
+    "New payment amount" to "নতুন পেমেন্টের পরিমাণ", "New received amount" to "নতুন প্রাপ্ত টাকার পরিমাণ", "Payment amount" to "পেমেন্টের পরিমাণ", "Received amount" to "প্রাপ্ত পরিমাণ",
+    "Employer / salary month" to "নিয়োগকর্তা / বেতনের মাস", "Salary deduction" to "বেতন থেকে কর্তন", "Direct financing" to "সরাসরি অর্থায়ন",
+    "Not recorded" to "লেখা নেই", "Not specified" to "উল্লেখ নেই", "No payment request" to "কোনো পেমেন্ট অনুরোধ নেই",
+    "Select specific date" to "নির্দিষ্ট তারিখ নির্বাচন", "Show password" to "পাসওয়ার্ড দেখান", "Hide password" to "পাসওয়ার্ড লুকান",
+    "Restore Encrypted Backup" to "এনক্রিপ্টেড ব্যাকআপ পুনরুদ্ধার", "Restore Legacy Backup?" to "পুরোনো ব্যাকআপ পুনরুদ্ধার করবেন?",
+    "Import Legacy Backup" to "পুরোনো ব্যাকআপ আমদানি", "Restore failed." to "পুনরুদ্ধার ব্যর্থ হয়েছে।", "Backup file is too large." to "ব্যাকআপ ফাইলটি খুব বড়।",
+    "This older JSON backup is readable and not encrypted. Import it only if you trust its source. Current records will be replaced." to "এই পুরোনো JSON ব্যাকআপটি পড়া যায় এবং এনক্রিপ্টেড নয়। উৎসটি বিশ্বাসযোগ্য হলে তবেই আমদানি করুন। বর্তমান রেকর্ড প্রতিস্থাপিত হবে।",
+    "This debt is archived and view-only. Restore it to make changes." to "দেনা-পাওনাটি আর্কাইভ করা এবং শুধু দেখা যাবে। পরিবর্তনের জন্য পুনরুদ্ধার করুন।",
+    "This debt is completed and view-only. Reopen it to make changes." to "দেনা-পাওনাটি সম্পন্ন এবং শুধু দেখা যাবে। পরিবর্তনের জন্য পুনরায় খুলুন।",
+    "This debt is fully paid. Reopen it before adding another payment." to "দেনা-পাওনা সম্পূর্ণ পরিশোধিত। নতুন পেমেন্ট যোগ করার আগে পুনরায় খুলুন।",
+    "This EMI is archived and view-only. Restore it to make changes." to "ইএমআই আর্কাইভ করা এবং শুধু দেখা যাবে। পরিবর্তনের জন্য পুনরুদ্ধার করুন।",
+    "This EMI is completed and view-only. Reopen it to make changes." to "ইএমআই সম্পন্ন এবং শুধু দেখা যাবে। পরিবর্তনের জন্য পুনরায় খুলুন।",
+    "This loan is archived and view-only. Restore it to make changes." to "ঋণ আর্কাইভ করা এবং শুধু দেখা যাবে। পরিবর্তনের জন্য পুনরুদ্ধার করুন।",
+    "This loan is completed and view-only. Reopen it to make changes." to "ঋণ সম্পন্ন এবং শুধু দেখা যাবে। পরিবর্তনের জন্য পুনরায় খুলুন।",
+    "Account" to "হিসাব", "Branch" to "শাখা", "Routing" to "রাউটিং", "Reference" to "রেফারেন্স", "Party" to "পক্ষ",
+    "Record" to "রেকর্ড", "Record Type" to "রেকর্ডের ধরন", "Payment No." to "পেমেন্ট নং", "Method" to "পদ্ধতি", "Provider / Bank" to "সেবাদাতা / ব্যাংক",
+    "Item" to "পণ্য", "Seller" to "বিক্রেতা", "Price" to "মূল্য", "Original" to "মূল পরিমাণ", "Type" to "ধরন",
+    "Expense" to "খরচ", "Expense total" to "মোট খরচ", "Entries" to "এন্ট্রি", "Plans" to "পরিকল্পনা",
+    "EMI SUMMARY" to "ইএমআই সারাংশ", "LOAN SUMMARY" to "ঋণ সারাংশ", "DEBT SUMMARY" to "দেনা-পাওনা সারাংশ", "EXPENSE SUMMARY" to "খরচের সারাংশ",
+    "EMI REPORT" to "ইএমআই রিপোর্ট", "LOAN REPORT" to "ঋণ রিপোর্ট", "DEBT REPORT" to "দেনা-পাওনা রিপোর্ট", "EXPENSE REPORT" to "খরচের রিপোর্ট",
+    "RECORD SUMMARY" to "রেকর্ড সারাংশ", "REPAYMENT HISTORY" to "পরিশোধের ইতিহাস", "CURRENT MONTH BY CATEGORY" to "এই মাসের ক্যাটাগরিভিত্তিক খরচ",
+    "↑ YOU NEED TO PAY" to "↑ আপনাকে পরিশোধ করতে হবে", "↓ YOU NEED TO RECEIVE" to "↓ আপনি টাকা পাবেন",
+    "Generated by My Finance Tracker" to "My Finance Tracker দ্বারা তৈরি", "Personal payment record generated by My Finance Tracker. Recipient confirmation or signature may be required as proof of payment." to "My Finance Tracker দ্বারা তৈরি ব্যক্তিগত পেমেন্ট রেকর্ড। পেমেন্টের প্রমাণ হিসেবে প্রাপকের নিশ্চিতকরণ বা স্বাক্ষর প্রয়োজন হতে পারে।",
+    "This is a personal payment request generated from the issuer's records. It is not a bank statement, legal judgment, or tax invoice." to "এটি ইস্যুকারীর রেকর্ড থেকে তৈরি ব্যক্তিগত পেমেন্ট অনুরোধ। এটি ব্যাংক স্টেটমেন্ট, আইনি রায় বা কর চালান নয়।",
+    "Generated" to "তৈরির সময়", "EMI plans" to "ইএমআই পরিকল্পনা", "Money I owe" to "আমার দেনা", "Money owed to me" to "আমার পাওনা",
+    "Debt to pay" to "পরিশোধযোগ্য দেনা", "Money to receive" to "প্রাপ্য টাকা", "Expense total" to "মোট খরচ",
+    "Request number" to "অনুরোধ নম্বর", "Request date" to "অনুরোধের তারিখ", "Request status" to "অনুরোধের অবস্থা",
+    "Requested by" to "অনুরোধকারী", "Payment requested from" to "যার কাছে পেমেন্ট চাওয়া হয়েছে", "Amount already received" to "আগে প্রাপ্ত পরিমাণ",
+    "Amount requested" to "অনুরোধকৃত পরিমাণ", "Amount received for request" to "অনুরোধের বিপরীতে প্রাপ্ত পরিমাণ", "Preferred method" to "পছন্দের পদ্ধতি",
+    "Provider / bank" to "সেবাদাতা / ব্যাংক", "Payment instructions" to "পেমেন্ট নির্দেশনা", "Account / mobile number" to "হিসাব / মোবাইল নম্বর",
+    "Receipt number" to "রসিদ নম্বর", "Payment date" to "পেমেন্টের তারিখ", "Payer" to "পরিশোধকারী", "Recipient" to "প্রাপক",
+    "Previous balance" to "আগের বাকি", "Remaining balance" to "বর্তমান বাকি", "Amount in words" to "কথায় পরিমাণ",
+    "Payer signature" to "পরিশোধকারীর স্বাক্ষর", "Recipient signature" to "প্রাপকের স্বাক্ষর", "Record" to "রেকর্ড",
+    "Account / last four digits" to "হিসাব / শেষ চার সংখ্যা", "Transaction/reference ID" to "লেনদেন/রেফারেন্স আইডি", "Method details" to "পদ্ধতির বিস্তারিত"
+)
+
 private fun localized(value: String, language: String = AppLocaleState.language): String {
     if (language != "BN") return value
     BanglaText[value]?.let { return it }
-    var result = value
-    listOf(
-        "Remaining" to "বাকি", "Total" to "মোট", "Paid" to "পরিশোধিত", "Received" to "প্রাপ্ত", "Due" to "বকেয়ার তারিখ",
-        "No records" to "কোনো রেকর্ড নেই", "Payment" to "পেমেন্ট", "Expense" to "খরচ", "Loan" to "ঋণ", "Debt" to "দেনা",
-        "Save" to "সংরক্ষণ", "Open" to "খুলুন", "Search" to "খুঁজুন", "Select" to "নির্বাচন", "Delete" to "মুছুন"
-    ).forEach { (english, bangla) -> result = result.replace(english, bangla, ignoreCase = false) }
-    return result
+    BanglaAdditionalText[value]?.let { return it }
+    BanglaValidationText[value]?.let { return it }
+    BanglaUiText2[value]?.let { return it }
+
+    val months = mapOf(
+        "January" to "জানুয়ারি", "February" to "ফেব্রুয়ারি", "March" to "মার্চ", "April" to "এপ্রিল",
+        "May" to "মে", "June" to "জুন", "July" to "জুলাই", "August" to "আগস্ট",
+        "September" to "সেপ্টেম্বর", "October" to "অক্টোবর", "November" to "নভেম্বর", "December" to "ডিসেম্বর"
+    )
+    Regex("^(January|February|March|April|May|June|July|August|September|October|November|December) (\\d{4})$")
+        .matchEntire(value)?.let { return "${months[it.groupValues[1]]} ${it.groupValues[2]}" }
+
+    // Translate structured labels and summaries as complete parts. This avoids the
+    // former mixed Bangla/English result caused by replacing individual words.
+    if (value.contains(" • ")) return value.split(" • ").joinToString(" • ") { localized(it, language) }
+    if (value.contains(": ")) {
+        val label = value.substringBefore(": ")
+        val content = value.substringAfter(": ")
+        return "${localized(label, language)}: ${localized(content, language)}"
+    }
+
+    Regex("^(\\d+) active$").matchEntire(value)?.let { return "${it.groupValues[1]}টি চলমান" }
+    Regex("^(\\d+) matching records$").matchEntire(value)?.let { return "মিলেছে ${it.groupValues[1]}টি রেকর্ড" }
+    Regex("^(EMI|Loans|Debts|Expenses) (\\d+)$").matchEntire(value)?.let { return "${localized(it.groupValues[1], language)} ${it.groupValues[2]}টি" }
+    Regex("^(\\d+) of (\\d+) paid$").matchEntire(value)?.let { return "${it.groupValues[2]}টির মধ্যে ${it.groupValues[1]}টি পরিশোধিত" }
+    Regex("^No (Active|Completed|Archived) EMI plans\\.$").matchEntire(value)?.let {
+        return when (it.groupValues[1]) { "Active" -> "কোনো চলমান ইএমআই পরিকল্পনা নেই।"; "Completed" -> "কোনো সম্পন্ন ইএমআই পরিকল্পনা নেই।"; else -> "কোনো আর্কাইভ করা ইএমআই পরিকল্পনা নেই।" }
+    }
+    Regex("^No (Active|Completed|Archived) loans\\.$").matchEntire(value)?.let {
+        return when (it.groupValues[1]) { "Active" -> "কোনো চলমান ঋণ নেই।"; "Completed" -> "কোনো সম্পন্ন ঋণ নেই।"; else -> "কোনো আর্কাইভ করা ঋণ নেই।" }
+    }
+    Regex("^No (Active|Completed|Archived) records\\.$").matchEntire(value)?.let { return "এই অবস্থায় কোনো রেকর্ড নেই।" }
+    Regex("^Search (.+)$").matchEntire(value)?.let { return "${localized(it.groupValues[1], language)} খুঁজুন" }
+    Regex("^Open (.+)$").matchEntire(value)?.let { return "${it.groupValues[1]} খুলুন" }
+    Regex("^(.+) / month$").matchEntire(value)?.let { return "${it.groupValues[1]} / মাস" }
+    Regex("^(Pay|Receive) (.+)$").matchEntire(value)?.let { return "${if (it.groupValues[1] == "Pay") "পরিশোধযোগ্য" else "প্রাপ্য"} ${it.groupValues[2]}" }
+    Regex("^(.+) left$").matchEntire(value)?.let { return "বাকি ${it.groupValues[1]}" }
+    Regex("^(.+) remaining$").matchEntire(value)?.let { return "বাকি ${it.groupValues[1]}" }
+    Regex("^Due (.+)$").matchEntire(value)?.let { return "পরিশোধের তারিখ ${it.groupValues[1]}" }
+    Regex("^Paid (.+)$").matchEntire(value)?.let { return "পরিশোধিত ${it.groupValues[1]}" }
+    Regex("^Received (.+)$").matchEntire(value)?.let { return "প্রাপ্ত ${it.groupValues[1]}" }
+    Regex("^Requested (.+)$").matchEntire(value)?.let { return "অনুরোধকৃত ${it.groupValues[1]}" }
+    Regex("^Completed (.+)$").matchEntire(value)?.let { return "সম্পন্ন ${it.groupValues[1]}" }
+    Regex("^Payment (\\d+)$").matchEntire(value)?.let { return "পেমেন্ট ${it.groupValues[1]}" }
+    Regex("^Edit Payment (\\d+)$").matchEntire(value)?.let { return "পেমেন্ট ${it.groupValues[1]} সম্পাদনা" }
+    Regex("^(.+) document\\(s\\) attached$").matchEntire(value)?.let { return "${it.groupValues[1]}টি ডকুমেন্ট সংযুক্ত" }
+    Regex("^Attach image or PDF \\((.+)\\)$").matchEntire(value)?.let { return "ছবি বা PDF সংযুক্ত করুন (${it.groupValues[1]})" }
+    Regex("^Amount cannot exceed the remaining (.+)\\.$").matchEntire(value)?.let { return "পরিমাণ বাকি ${it.groupValues[1]}-এর বেশি হতে পারবে না।" }
+    Regex("^Payment cannot be more than the remaining (.+)\\.$").matchEntire(value)?.let { return "পেমেন্ট বাকি ${it.groupValues[1]}-এর বেশি হতে পারবে না।" }
+    Regex("^Amount cannot exceed this request's outstanding balance\\.$").matchEntire(value)?.let { return "পরিমাণ এই অনুরোধের বাকি টাকার বেশি হতে পারবে না।" }
+    Regex("^(.+) will remain in your records but cannot receive further payments\\. This action cannot be undone\\.$").matchEntire(value)?.let { return "${it.groupValues[1]} রেকর্ডে থাকবে, তবে এতে আর পেমেন্ট গ্রহণ করা যাবে না। এই কাজটি ফিরিয়ে নেওয়া যাবে না।" }
+    Regex("^Save the changed direction, financial details, notes, and documents for (.+)\\?$").matchEntire(value)?.let { return "${it.groupValues[1]}-এর পরিবর্তিত ধরন, আর্থিক তথ্য, নোট ও ডকুমেন্ট সংরক্ষণ করবেন?" }
+    Regex("^Save the new dates and notes for payment (\\d+)\\?$").matchEntire(value)?.let { return "পেমেন্ট ${it.groupValues[1]}-এর নতুন তারিখ ও নোট সংরক্ষণ করবেন?" }
+    Regex("^Save these changes to (.+) for (.+)\\?$").matchEntire(value)?.let { return "${it.groupValues[1]}-এর ${it.groupValues[2]} পরিমাণের পরিবর্তন সংরক্ষণ করবেন?" }
+    Regex("^You are about to change (.+) for (.+)\\.$").matchEntire(value)?.let { return "আপনি ${it.groupValues[1]}-এর ${it.groupValues[2]} পরিমাণের তথ্য পরিবর্তন করতে যাচ্ছেন।" }
+    Regex("^You are about to change payment (\\d+), including its dates or notes\\.$").matchEntire(value)?.let { return "আপনি পেমেন্ট ${it.groupValues[1]}-এর তারিখ বা নোট পরিবর্তন করতে যাচ্ছেন।" }
+    Regex("""^Delete "(.+)" and all of its payment history\? This cannot be undone\.$""").matchEntire(value)?.let { return "‘${it.groupValues[1]}’ ও এর সম্পূর্ণ পেমেন্ট ইতিহাস মুছবেন? এটি ফিরিয়ে নেওয়া যাবে না।" }
+    Regex("""^Delete "(.+)" for (.+)\? This cannot be undone\.$""").matchEntire(value)?.let { return "‘${it.groupValues[1]}’-এর ${it.groupValues[2]} পরিমাণের রেকর্ড মুছবেন? এটি ফিরিয়ে নেওয়া যাবে না।" }
+    Regex("^Delete (EMI|Loan|Debt)\\?$").matchEntire(value)?.let { return "${localized(it.groupValues[1], language)} মুছবেন?" }
+
+    return value
 }
 
 private fun localizedExport(value: String): String {
@@ -261,7 +547,7 @@ private fun localizedExport(value: String): String {
     val trimmed = value.trim()
     if (trimmed.contains(":")) {
         val label = trimmed.substringBefore(":")
-        return localized(label) + ":" + trimmed.substringAfter(":")
+        return localized(label) + ":" + localized(trimmed.substringAfter(":").trim())
     }
     return localized(trimmed)
 }
@@ -274,9 +560,18 @@ fun Text(
     fontSize: TextUnit = TextUnit.Unspecified,
     fontWeight: FontWeight? = null,
     maxLines: Int = Int.MAX_VALUE,
-    style: TextStyle = TextStyle.Default
+    style: TextStyle = LocalTextStyle.current
 ) {
-    MaterialText(localized(text, LocalAppLanguage.current), modifier, color, fontSize, fontWeight = fontWeight, maxLines = maxLines, style = style)
+    val resolvedColor = if (color == Color.Unspecified) LocalContentColor.current else color
+    MaterialText(
+        text = localized(text, LocalAppLanguage.current),
+        modifier = modifier,
+        color = resolvedColor,
+        fontSize = fontSize,
+        fontWeight = fontWeight,
+        maxLines = maxLines,
+        style = style
+    )
 }
 
 
@@ -7254,7 +7549,7 @@ fun AboutScreen(done: () -> Unit) {
                 modifier = Modifier.size(112.dp)
             )
             Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text("Version 6.0")
+            Text("Version 6.1")
             Spacer(Modifier.height(8.dp))
             Text("Created and owned by", color = MaterialTheme.colorScheme.secondary)
             Text("Md. Zahid Alam", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
@@ -8600,7 +8895,8 @@ fun SetupScreen(
                 MaterialTheme.typography
                     .headlineSmall,
             fontWeight =
-                FontWeight.Bold
+                FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(
@@ -8610,7 +8906,8 @@ fun SetupScreen(
         Text(
             "Create an app password. " +
                     "The password itself is not stored; " +
-                    "only a protected hash is stored on this phone."
+                    "only a protected hash is stored on this phone.",
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(
@@ -8747,14 +9044,15 @@ fun LockScreen(
                 MaterialTheme.typography
                     .headlineSmall,
             fontWeight =
-                FontWeight.Bold
+                FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
         )
 
         Spacer(
             Modifier.height(8.dp)
         )
 
-        Text("Your private offline finance tracker")
+        Text("Your private offline finance tracker", color = MaterialTheme.colorScheme.onBackground)
 
         Spacer(
             Modifier.height(16.dp)
