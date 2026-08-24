@@ -1,0 +1,19 @@
+MY FINANCE TRACKER 10.0
+
+Professional internal architecture release
+
+- Preserves the complete Version 9.0 user-facing feature set and storage compatibility.
+- Reduces MainActivity.kt from 9,260 lines to 134 lines.
+- Separates authentication, navigation, presentation, dashboard, plan lists, payment forms,
+  payment history, expenses, settings/components, reports and Android data infrastructure.
+- Adds architecture boundary tests and an executable critical-feature parity contract.
+- Keeps the package name, signing configuration, encrypted local format, JSON keys,
+  encrypted backups, legacy restore support and attachment data unchanged.
+- Retains the Calm Financial design system, light/dark themes, Bengali/English support,
+  responsive width constraints and the offline searchable country/currency catalog.
+- Retains the structured PDF pipeline and professional eight-sheet XLSX workbook.
+
+Build requirement
+
+The GitHub workflow runs all unit tests before producing the signed release APK and AAB.
+Use the same permanent signing secrets as earlier releases for an in-place Android update.

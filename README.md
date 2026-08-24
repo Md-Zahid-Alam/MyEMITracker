@@ -1,6 +1,13 @@
-# My Finance Tracker — Version 9.0
+# My Finance Tracker — Version 10.0
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
+
+## Version 10.0 updates
+
+- Decomposes the former 9,260-line application host into authentication, navigation, presentation, dashboard, payment, expense, settings, report and infrastructure source boundaries.
+- Keeps `MainActivity.kt` as a 134-line application host with no repository, JSON, PDF or feature-form implementation.
+- Adds executable architecture and feature-parity contracts to the unit-test suite.
+- Preserves Version 9 encrypted data, backup restore, reports, country catalog and every user-facing workflow.
 
 ## Version 9.0 updates
 
