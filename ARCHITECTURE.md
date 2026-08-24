@@ -1,4 +1,4 @@
-# My Finance Tracker architecture
+# My Finance Tracker architecture — Version 9
 
 The project uses one Android application module with package boundaries that follow a layered architecture.
 
@@ -10,6 +10,11 @@ The project uses one Android application module with package boundaries that fol
 - `data/backup`: backup security policies.
 - `export/xlsx`: independently testable OOXML rules.
 - `core/designsystem`: centralized colors, typography, shapes and spacing.
+- `core/country`: complete offline ISO country/currency catalog.
+- `core/ui`: reusable application-level Compose controls.
+- `domain/validation`: reusable pure validation rules.
+- `navigation`: typed destination contracts.
+- `export/model`: renderer-independent structured report documents.
 - root application package: Android integration and the remaining Compose feature screens.
 
 ## Dependency direction

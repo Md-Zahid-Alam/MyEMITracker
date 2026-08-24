@@ -1,4 +1,4 @@
-# Finance design system
+# Finance design system — Version 9
 
 Version 8.0 uses the **Calm Financial** direction: trustworthy teal, quiet neutral surfaces, strong hierarchy, restrained elevation and accessible semantic status colors.
 
@@ -24,3 +24,10 @@ The visual language is defined by `core/designsystem/FinanceDesignSystem.kt`.
 - User-entered financial information is never translated or recolored as status text.
 
 Future UI changes must reuse these tokens instead of adding isolated colors or arbitrary dimensions.
+
+## Version 9 report and regional components
+
+- Country selection uses a searchable offline ISO catalog, generated flag, currency metadata and Bengali/English display names.
+- Reports share product identity, teal hierarchy, document metadata and currency context.
+- Excel uses dedicated dashboard, EMI, loan, debt-direction, expense, payment and payment-request sheets with frozen/filterable headers.
+- PDF input is converted into semantic headings, fields, paragraphs, tables and signatures before rendering.

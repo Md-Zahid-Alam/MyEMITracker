@@ -1,0 +1,14 @@
+MY FINANCE TRACKER 9.0
+
+- Preserves the complete Version 8.3 feature surface and encrypted data/backup compatibility.
+- Adds a complete offline searchable ISO country selector with generated flags.
+- Searches by country name, ISO code or currency code and fills default currency automatically.
+- Keeps currency editable and never converts existing amounts silently.
+- Adds typed navigation, centralized validation and structured report foundations.
+- Formalizes the Calm Financial professional design-system and responsive contracts.
+- Upgrades Excel into eight organized sheets: dashboard, EMI, loans, debts I owe, owed to me, expenses, payments and payment requests.
+- Adds workbook titles, metadata, frozen headers, filters and print setup.
+- Routes PDF content through a structured document model while preserving all existing fields and signatures.
+- Adds validation and country-catalog regression tests.
+
+Use the permanent signing secrets for the release APK/AAB so Version 9.0 updates the installed app.

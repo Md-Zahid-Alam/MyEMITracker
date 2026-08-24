@@ -1,4 +1,4 @@
-My Finance Tracker - Version 8.3
+My Finance Tracker - Version 9.0
 
 Package: com.mdzahidalam.myfinancetracker
 Version code: 25

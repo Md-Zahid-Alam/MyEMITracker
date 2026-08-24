@@ -1,6 +1,13 @@
-# My Finance Tracker — Version 8.3
+# My Finance Tracker — Version 9.0
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
+
+## Version 9.0 updates
+
+- Complete offline searchable ISO country selector with flags and automatic currency defaults.
+- Professional architecture foundations for typed navigation, centralized validation and structured report documents.
+- Premium Excel workbook with organized summary, EMI, loan, split-debt, expense, payment and request sheets.
+- Version 8.3 encrypted records, backups, attachments and all user workflows remain compatible.
 
 ## Version 8.3 updates
 
