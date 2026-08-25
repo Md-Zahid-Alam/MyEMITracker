@@ -17,6 +17,9 @@
 - Forms use one shared header with back navigation, premium surface treatment and explicit read-only state.
 - Shared fields, dates, dropdowns, attachments, confirmation dialogs and unsaved-change handling retained.
 - English/Bangla, dark mode and responsive scrolling/content constraints retained.
+- Adaptive top-level navigation uses a bottom bar on phones and a labeled rail on wide displays.
+- Narrow layouts stack dashboard commitment cards to preserve readable text and touch targets.
+- Shared premium empty states and accessibility heading semantics are covered by a UI contract test.
 - No user field, button, filter, status or action was removed.
 
 ## Reports
@@ -32,4 +35,4 @@
 - Architecture boundary and critical feature-parity tests.
 - GitHub runs tests before signed APK/AAB generation.
 
-Build 29 is the final Version 11 source candidate and remains gated by the GitHub test and signed-build workflow.
+Build 30 is the final UI/UX Version 11 source candidate and remains gated by the GitHub test and signed-build workflow.

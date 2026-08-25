@@ -1,4 +1,4 @@
-MY FINANCE TRACKER 11.0 — FINAL SOURCE CANDIDATE (BUILD 29)
+MY FINANCE TRACKER 11.0 — PREMIUM UI/UX UPDATE 1 (BUILD 31)
 
 Architecture
 - Real package declarations now match presentation, navigation, feature and infrastructure boundaries.
@@ -15,6 +15,14 @@ Design system and experience
 - Form/detail headers now use a consistent elevated premium surface and clearly label view-only records.
 - English, Bangla, dark mode, country flags, offline country search and currency defaults remain available.
 - No form field, action, filter, status, document workflow or safety confirmation was removed.
+- Phones retain labeled bottom navigation; displays 840dp and wider use a labeled navigation rail.
+- Dashboard commitment cards stack on narrow screens and with constrained text space.
+- Payment-plan cards share consistent premium surfaces, shapes and elevation.
+- Shared headings expose accessibility semantics and empty payment lists use bilingual guidance.
+- Feature and shared-UI layout spacing now uses the centralized FinanceSpacing scale instead of screen-specific numeric values.
+- Reports, expenses, payment lists and document pages share premium empty-state treatment.
+- Report PDF/XLSX saves now provide accessible success or error feedback.
+- Report, expense and payment cards use consistent semantic surfaces, shapes and elevation.
 
 Reports
 - Structured report blocks remain the common PDF document input.
@@ -27,4 +35,4 @@ Compatibility
 - Version 10 encrypted data, attachments, JSON keys, encrypted backups and supported legacy restore remain compatible.
 
 Release gate
-- Build 29 is the final Version 11 source candidate. It becomes the signed final release after GitHub unit tests and APK/AAB generation pass.
+- Build 31 is Premium UI/UX Update 1 of 3. It becomes installable after GitHub unit tests and APK/AAB generation pass.
