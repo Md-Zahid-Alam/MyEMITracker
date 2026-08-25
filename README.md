@@ -1,6 +1,13 @@
-# My Finance Tracker — Version 10.0
+# My Finance Tracker — Version 11.0
 
 Offline Android finance tracker for EMI plans, loans, debts, payments, and daily expenses.
+
+## Version 11.0 updates
+
+- Enforces real feature, presentation, navigation, data, security and notification package namespaces.
+- Prevents Compose/feature dependencies from entering the data layer through executable architecture tests.
+- Preserves every Version 10 workflow and encrypted-data/backup compatibility contract.
+- Keeps the Calm Financial professional UI system and structured premium PDF/XLSX exports.
 
 ## Version 10.0 updates
 

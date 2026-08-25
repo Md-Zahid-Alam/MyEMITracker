@@ -1,0 +1,28 @@
+MY FINANCE TRACKER 11.0 — FINAL ARCHITECTURE RELEASE CANDIDATE
+
+Architecture
+- Real package declarations now match presentation, navigation, feature and infrastructure boundaries.
+- MainActivity remains a small application/session host.
+- Data, security and notification sources contain no Compose or feature dependencies.
+- ReminderReceiver moved to its infrastructure package and the manifest was updated.
+- Architecture tests enforce package declarations and dependency restrictions.
+- Feature-parity tests retain all critical workflows and compatibility keys.
+
+Design system and experience
+- Calm Financial semantic light/dark palettes, typography, spacing, shapes and content-width rules remain authoritative.
+- Shared form headers, fields, date controls, dropdowns, confirmations, attachment controls and settings rows remain centralized.
+- Form/detail headers now use a consistent elevated premium surface and clearly label view-only records.
+- English, Bangla, dark mode, country flags, offline country search and currency defaults remain available.
+- No form field, action, filter, status, document workflow or safety confirmation was removed.
+
+Reports
+- Structured report blocks remain the common PDF document input.
+- Branded PDF headers, semantic sections, field rows, signatures, pagination and ownership footers remain supported.
+- Professional XLSX retains eight organized sheets, numeric money cells, metadata, frozen/filterable headers and print settings.
+
+Compatibility
+- Package/application ID and release signing configuration are unchanged.
+- Version 10 encrypted data, attachments, JSON keys, encrypted backups and supported legacy restore remain compatible.
+
+Release gate
+- Version 11 is final only after GitHub unit tests and the signed APK/AAB build pass.

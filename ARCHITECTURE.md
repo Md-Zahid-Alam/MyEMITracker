@@ -1,4 +1,4 @@
-# My Finance Tracker architecture — Version 9
+# My Finance Tracker architecture — Version 11
 
 The project uses one Android application module with package boundaries that follow a layered architecture.
 
@@ -48,4 +48,4 @@ New financial rules must be placed in `domain/usecase` and covered by unit tests
 - `feature/reports`: report filtering, structured PDF rendering and XLSX generation.
 - `core/ui`: settings and shared form/payment components.
 
-The first Version 10 extraction deliberately keeps compatible declarations in the application package so moving files cannot change serialization, manifest component names or encrypted data behavior. Further namespace moves must be behavior-neutral and covered by the architecture and feature-parity tests.
+Version 11 assigns real package namespaces to feature, presentation, navigation, repository, security and notification sources. Only the small application host and compatibility foundation remain in the root namespace. Architecture tests prevent Compose or feature imports in the data layer and verify the critical package declarations.
