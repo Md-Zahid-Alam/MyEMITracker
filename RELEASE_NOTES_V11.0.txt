@@ -1,4 +1,4 @@
-MY FINANCE TRACKER 11.0 — PREMIUM UI/UX UPDATE 1 (BUILD 31)
+MY FINANCE TRACKER 11.0 — PREMIUM UI/UX UPDATE 2 (BUILD 32)
 
 Architecture
 - Real package declarations now match presentation, navigation, feature and infrastructure boundaries.
@@ -23,6 +23,12 @@ Design system and experience
 - Reports, expenses, payment lists and document pages share premium empty-state treatment.
 - Report PDF/XLSX saves now provide accessible success or error feedback.
 - Report, expense and payment cards use consistent semantic surfaces, shapes and elevation.
+- Forms are centered and constrained to the professional form width on landscape, tablet and foldable displays.
+- Dashboard cards stack when the available width is narrow or Android font scaling is 130% and above.
+- Navigation labels use scalable theme typography and safe ellipsis while preserving full accessibility labels.
+- Payment-request actions adapt to two rows for narrow or large-text layouts.
+- Interactive plan cards expose button semantics and compact controls enforce a 48dp minimum touch target.
+- Report filters, expense summaries and payment progress use restrained state-change animations only.
 
 Reports
 - Structured report blocks remain the common PDF document input.
@@ -35,4 +41,4 @@ Compatibility
 - Version 10 encrypted data, attachments, JSON keys, encrypted backups and supported legacy restore remain compatible.
 
 Release gate
-- Build 31 is Premium UI/UX Update 1 of 3. It becomes installable after GitHub unit tests and APK/AAB generation pass.
+- Build 32 is Premium UI/UX Update 2 of 3. It becomes installable after GitHub unit tests and APK/AAB generation pass.

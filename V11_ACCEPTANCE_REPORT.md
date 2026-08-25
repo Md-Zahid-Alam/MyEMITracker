@@ -20,6 +20,8 @@
 - Adaptive top-level navigation uses a bottom bar on phones and a labeled rail on wide displays.
 - Narrow layouts stack dashboard commitment cards to preserve readable text and touch targets.
 - Shared premium empty states and accessibility heading semantics are covered by a UI contract test.
+- Large-text-aware dashboard composition, form width constraints, adaptive payment-request actions and safe navigation labels are covered by UI contracts.
+- Interactive plan cards expose roles, compact controls enforce minimum touch height, and motion is limited to visibility/progress changes.
 - No user field, button, filter, status or action was removed.
 
 ## Reports
@@ -35,4 +37,4 @@
 - Architecture boundary and critical feature-parity tests.
 - GitHub runs tests before signed APK/AAB generation.
 
-Build 30 is the final UI/UX Version 11 source candidate and remains gated by the GitHub test and signed-build workflow.
+Build 32 is Premium UI/UX Update 2 and remains gated by the GitHub test and signed-build workflow.
