@@ -7,6 +7,7 @@
 - Real namespaces: authentication, dashboard, payments, expenses, reports, presentation, navigation, repository, security and notifications.
 - Data dependency rule: no Compose imports and no feature imports; enforced by unit test.
 - Navigation state: validated `FinanceRoute` value and `PaymentSection` enum replace raw mutable route/section strings.
+- Presentation: immutable feature projections keep each screen limited to the records it needs while the encrypted repository remains the single source of truth.
 - Domain: models, calculations, validation and repository contract remain Android/Compose independent.
 - Compatibility: application ID, signing config, encryption format, JSON keys and backup restore formats unchanged.
 
@@ -23,6 +24,7 @@
 - Renderer-independent report blocks retained.
 - Dedicated receipt, payment-request, summary and detailed-document domain types added.
 - Branded PDF and organized eight-sheet XLSX capabilities retained without changing export file compatibility.
+- PDF paragraphs and field values wrap according to measured glyph width, including Bangla text.
 
 ## Automated release gates
 
@@ -30,4 +32,4 @@
 - Architecture boundary and critical feature-parity tests.
 - GitHub runs tests before signed APK/AAB generation.
 
-Version 11 remains a release candidate until the GitHub workflow passes.
+Build 29 is the final Version 11 source candidate and remains gated by the GitHub test and signed-build workflow.

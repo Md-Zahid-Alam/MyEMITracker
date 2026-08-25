@@ -1,4 +1,4 @@
-MY FINANCE TRACKER 11.0 — FINAL ARCHITECTURE RELEASE CANDIDATE
+MY FINANCE TRACKER 11.0 — FINAL SOURCE CANDIDATE (BUILD 29)
 
 Architecture
 - Real package declarations now match presentation, navigation, feature and infrastructure boundaries.
@@ -7,6 +7,7 @@ Architecture
 - ReminderReceiver moved to its infrastructure package and the manifest was updated.
 - Architecture tests enforce package declarations and dependency restrictions.
 - Feature-parity tests retain all critical workflows and compatibility keys.
+- Dashboard, payments, expenses, reports and settings expose immutable feature-specific UI state projections.
 
 Design system and experience
 - Calm Financial semantic light/dark palettes, typography, spacing, shapes and content-width rules remain authoritative.
@@ -18,6 +19,7 @@ Design system and experience
 Reports
 - Structured report blocks remain the common PDF document input.
 - Branded PDF headers, semantic sections, field rows, signatures, pagination and ownership footers remain supported.
+- PDF wrapping uses measured rendered width for clearer Bangla text, long names and payment instructions.
 - Professional XLSX retains eight organized sheets, numeric money cells, metadata, frozen/filterable headers and print settings.
 
 Compatibility
@@ -25,4 +27,4 @@ Compatibility
 - Version 10 encrypted data, attachments, JSON keys, encrypted backups and supported legacy restore remain compatible.
 
 Release gate
-- Version 11 is final only after GitHub unit tests and the signed APK/AAB build pass.
+- Build 29 is the final Version 11 source candidate. It becomes the signed final release after GitHub unit tests and APK/AAB generation pass.
