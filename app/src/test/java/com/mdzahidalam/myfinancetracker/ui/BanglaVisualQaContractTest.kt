@@ -47,6 +47,7 @@ class BanglaVisualQaContractTest {
     @Test
     fun normalPhoneUsesCompactDashboardWhileLargeTextStillStacks() {
         val source = File(sourceRoot, "feature/dashboard/DashboardScreen.kt").readText()
-        assertTrue(source.contains("maxWidth < 340.dp || largeText"))
+        assertTrue(source.contains("maxWidth < 320.dp || largeText"))
+        assertTrue(source.contains("fontScale >= 1.6f"))
     }
 }
