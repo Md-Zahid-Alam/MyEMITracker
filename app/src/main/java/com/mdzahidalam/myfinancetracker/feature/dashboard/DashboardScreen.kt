@@ -428,12 +428,15 @@ private fun AdaptiveSummaryPair(
     secondTitle: String,
     secondValue: String
 ) {
-    val largeText = LocalDensity.current.fontScale >= 1.3f
+    // Some manufacturers report their normal/medium display font near 1.3x.
+    // Reserve stacking for genuinely large accessibility text so a normal
+    // 360dp-class phone still gets the more useful two-column dashboard.
+    val largeText = LocalDensity.current.fontScale >= 1.6f
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         // Normal-width phones such as the 360dp Realme Note 70 can show the
         // compact two-column overview. Very small widths and large text retain
         // the safer stacked layout.
-        if (maxWidth < 340.dp || largeText) {
+        if (maxWidth < 320.dp || largeText) {
             Column(verticalArrangement = Arrangement.spacedBy(FinanceSpacing.sm)) {
                 SummaryCard(firstTitle, firstValue, Modifier.fillMaxWidth())
                 SummaryCard(secondTitle, secondValue, Modifier.fillMaxWidth())
