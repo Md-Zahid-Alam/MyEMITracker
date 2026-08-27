@@ -1,11 +1,14 @@
 package com.mdzahidalam.myfinancetracker.ui
 
 import java.io.File
-import kotlin.test.Test
-import kotlin.test.assertTrue
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class BanglaVisualQaContractTest {
-    private val sourceRoot = File("src/main/java/com/mdzahidalam/myfinancetracker")
+    private val sourceRoot = listOf(
+        File("src/main/java/com/mdzahidalam/myfinancetracker"),
+        File("app/src/main/java/com/mdzahidalam/myfinancetracker")
+    ).first { it.exists() }
 
     @Test
     fun screenshotVisibleEnglishHasBanglaCoverage() {
@@ -21,7 +24,7 @@ class BanglaVisualQaContractTest {
             "Security and local data",
             "Documents and app"
         ).forEach { english ->
-            assertTrue(source.contains("\"$english\" to \""), "Missing Bangla mapping for: $english")
+            assertTrue("Missing Bangla mapping for: $english", source.contains("\"$english\" to \""))
         }
     }
 
@@ -30,14 +33,14 @@ class BanglaVisualQaContractTest {
         val source = File(sourceRoot, "core/legacy/LegacyFoundation.kt").readText()
         listOf(
             "matching records •",
-            "Today\\\\s+",
+            "Regex(\"^Today",
             "Money I Owe •",
             "Money Owed to Me •",
             "Next payment:",
             "You owe",
             "owes you"
         ).forEach { template ->
-            assertTrue(source.contains(template), "Missing dynamic Bangla template: $template")
+            assertTrue("Missing dynamic Bangla template: $template", source.contains(template))
         }
     }
 
