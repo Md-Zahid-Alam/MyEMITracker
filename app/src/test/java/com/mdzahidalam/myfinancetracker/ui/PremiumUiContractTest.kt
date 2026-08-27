@@ -54,7 +54,8 @@ class PremiumUiContractTest {
         val dashboard = File(sourceRoot, "feature/dashboard/DashboardScreen.kt").readText()
         val forms = File(sourceRoot, "core/ui/FinanceComponents.kt").readText()
         val navigation = File(sourceRoot, "navigation/FinanceAppNavigation.kt").readText()
-        assertTrue(dashboard.contains("fontScale >= 1.3f"))
+        assertTrue(dashboard.contains("fontScale >= 1.6f"))
+        assertTrue(dashboard.contains("maxWidth < 320.dp || largeText"))
         assertTrue(forms.contains("widthIn(max = FinanceLayout.formContentMax)"))
         assertTrue(navigation.contains("TextOverflow.Ellipsis"))
     }
