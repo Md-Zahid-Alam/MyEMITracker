@@ -542,7 +542,14 @@ fun FinanceApp(
                 }
 
                 selectedType.key == "about" -> {
-                    AboutScreen(done = { selectedType = FinanceRoute.None })
+                    AboutScreen(
+                        done = { selectedType = FinanceRoute.None },
+                        onLicence = { selectedType = FinanceRoute.of("licence") }
+                    )
+                }
+
+                selectedType.key == "licence" -> {
+                    LicenceScreen(done = { selectedType = FinanceRoute.of("about") })
                 }
 
                 selectedType.key == "receipt_profile" -> {
