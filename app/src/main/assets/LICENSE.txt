@@ -1,0 +1,29 @@
+MY FINANCE TRACKER - PERSONAL USE LICENCE
+Licence version: 1 September 2026
+
+Copyright © 2026 Md. Zahid Alam. All rights reserved.
+
+1. Licence grant
+This application is licensed, not sold. You may install and use it for your
+personal, non-commercial financial record keeping.
+
+2. Restrictions
+Without prior written permission from Md. Zahid Alam, you may not redistribute,
+resell, publish, sublicense, or create and distribute modified or derivative
+versions of this application, except where applicable law expressly permits
+otherwise.
+
+3. Ownership
+The application, source code, branding, visual assets, reports, documentation,
+and original content remain the intellectual property of Md. Zahid Alam. This
+licence does not transfer ownership.
+
+4. Privacy and local data
+My Finance Tracker is designed for offline use. Your records remain on your
+device unless you choose to export, share, or restore a backup or generated
+document.
+
+5. No warranty
+The application is provided as is, without warranties to the extent permitted
+by applicable law. You are responsible for checking records and maintaining
+secure backups.
