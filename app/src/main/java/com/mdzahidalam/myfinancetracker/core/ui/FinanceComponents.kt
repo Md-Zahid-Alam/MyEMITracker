@@ -514,7 +514,7 @@ fun ReceiptProfileForm(existing: ReceiptProfile, onSave: (ReceiptProfile) -> Uni
 }
 
 @Composable
-fun AboutScreen(done: () -> Unit) {
+fun AboutScreen(done: () -> Unit, onLicence: () -> Unit) {
     FormColumn(title = "About", onBack = done) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -539,6 +539,41 @@ fun AboutScreen(done: () -> Unit) {
             Text("© 2026 Md. Zahid Alam")
             Text("All rights reserved.")
         }
+
+        DetailNavigationButton(
+            "Licence and copyright",
+            "Personal-use terms, ownership and permitted use",
+            onLicence
+        )
+    }
+}
+
+@Composable
+fun LicenceScreen(done: () -> Unit) {
+    FormColumn(title = "Licence and copyright", onBack = done) {
+        Text("My Finance Tracker", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text("© 2026 Md. Zahid Alam. All rights reserved.", color = MaterialTheme.colorScheme.primary)
+
+        PremiumSectionHeader("Licence grant")
+        Text("This application is licensed, not sold. You may install and use it for your personal, non-commercial financial record keeping.")
+
+        PremiumSectionHeader("Restrictions")
+        Text("Without prior written permission from Md. Zahid Alam, you may not redistribute, resell, publish, sublicense, or create and distribute modified or derivative versions of this application, except where applicable law expressly permits otherwise.")
+
+        PremiumSectionHeader("Ownership")
+        Text("The application, source code, branding, visual assets, reports, documentation, and original content remain the intellectual property of Md. Zahid Alam. This licence does not transfer ownership.")
+
+        PremiumSectionHeader("Privacy and local data")
+        Text("My Finance Tracker is designed for offline use. Your records remain on your device unless you choose to export, share, or restore a backup or generated document.")
+
+        PremiumSectionHeader("No warranty")
+        Text("The application is provided as is, without warranties to the extent permitted by applicable law. You are responsible for checking records and maintaining secure backups.")
+
+        Text(
+            "Licence version: 1 September 2026",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
